@@ -1,26 +1,14 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import PrivateLayout from '@/components/layouts/PrivateLayout';
 
 function RoleGuard({ allowedPermissionsAny = [], allowedPermissionsAll = [], children }) {
   const { user, loading } = useAuth();
-  const navigate = useNavigate();
 
   useEffect(() => {
-    if (!loading && user) {
-      // Permission-based guard
-      const perms = user?.permissions || {};
-      const hasAny = allowedPermissionsAny.length === 0 || allowedPermissionsAny.some(p => perms[p] === true);
-      const hasAll = allowedPermissionsAll.length === 0 || allowedPermissionsAll.every(p => perms[p] === true);
-      if (!hasAny || !hasAll) {
-        navigate('/home', { replace: true });
-      }
-    }
-    if (!loading && !user) {
-      navigate('/login', { replace: true });
-    }
-  }, [user, loading, navigate, allowedPermissionsAny, allowedPermissionsAll]);
+    // No redirect on insufficient permissions; keep user on the current page
+    // Authentication absence is handled by higher-level wrappers/routes
+  }, [user, loading, allowedPermissionsAny, allowedPermissionsAll]);
 
   if (loading) {
     return (
@@ -39,7 +27,17 @@ function RoleGuard({ allowedPermissionsAny = [], allowedPermissionsAll = [], chi
   const hasAny = allowedPermissionsAny.length === 0 || allowedPermissionsAny.some(p => perms[p] === true);
   const hasAll = allowedPermissionsAll.length === 0 || allowedPermissionsAll.every(p => perms[p] === true);
   if (!hasAny || !hasAll) {
-    return null;
+    // Show an unauthorized message instead of redirecting to home
+    return (
+      <PrivateLayout>
+        <div className="min-h-[40vh] flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-2xl font-semibold text-gray-900 mb-2">Yetkiniz yok</h2>
+            <p className="text-gray-600">Bu sayfayı görüntülemek için yeterli izinlere sahip değilsiniz.</p>
+          </div>
+        </div>
+      </PrivateLayout>
+    );
   }
 
   return <PrivateLayout>{children}</PrivateLayout>;
