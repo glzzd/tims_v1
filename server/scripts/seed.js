@@ -11,32 +11,30 @@ const seedUsers = [
   {
     name: 'Full Permission User',
     email: 'root@tims.az',
-    password: 'root123456',
+    password: 'root123',
     isActive: true,
     permissions: {
       isSuperAdmin: true,
+      canAddAdmin: true,
+      canAddUser: true,
+      canAddEmployee: true,
+      canMessageAllGroups: true,
+      canMessageInstitutionGroups: true,
+      canReadAllGroups: true,
+      canWriteAllGroups: true,
+      canReadInstitutionGroups: true,
+      canWriteInstitutionGroups: true,
       canReadAllUsers: true,
-      canReadOwnInstitutionUsers: true,
-      canWriteAllUsers: true,
-      canWriteOwnInstitutionUsers: true,
       canUpdateAllUsers: true,
-      canUpdateOwnInstitutionUsers: true,
       canDeleteUsers: true,
-      canDeleteOwnInstitutionUsers: true
+      canWriteAllUsers: true,
+      canReadOwnInstitutionUsers: true,
+      canWriteOwnInstitutionUsers: true,
+      canUpdateOwnInstitutionUsers: true,
+      canDeleteOwnInstitutionUsers: true,
+      canMessageDirect: true
     },
     institution: null
-  },
-  {
-    name: 'Admin İstifadəçi',
-    email: 'admin@tims.az',
-    password: 'admin123456',
-    isActive: true
-  },
-  {
-    name: 'Test İstifadəçi',
-    email: 'demo@test.az',
-    password: 'test123456',
-    isActive: true
   }
 ];
 
