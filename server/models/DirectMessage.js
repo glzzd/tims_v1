@@ -134,7 +134,11 @@ directMessageSchema.set('toJSON', {
   transform: function(doc, ret) {
     delete ret.encryptedContent;
     delete ret.iv;
+    // UI üçün decrypted məzmunu content kimi göstər
+    ret.content = ret.decryptedContent;
+    // Xam content saxlanmadığı üçün redundansı təmizlə və yenidən təyin et
     delete ret.content;
+    ret.content = ret.decryptedContent;
     delete ret.__v;
     return ret;
   }

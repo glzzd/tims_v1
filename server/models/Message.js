@@ -122,10 +122,6 @@ messageSchema.virtual('decryptedContent').get(function() {
   return this.content;
 });
 
-messageSchema.virtual('readCount').get(function() {
-  return this.isRead ? this.isRead.length : 0;
-});
-
 messageSchema.virtual('displayInfo').get(function() {
   return {
     id: this._id,
@@ -133,7 +129,6 @@ messageSchema.virtual('displayInfo').get(function() {
     messageType: this.messageType,
     fileName: this.fileName,
     fileSize: this.fileSize,
-    readCount: this.readCount,
     isDeleted: this.isDeleted,
     editedAt: this.editedAt,
     createdAt: this.createdAt
@@ -258,7 +253,13 @@ messageSchema.set('toJSON', {
     // Şifrəli məlumatları gizlə
     delete ret.encryptedContent;
     delete ret.iv;
-    delete ret.content;
+    // Oxunma ilə bağlı məlumatları gizlə
+    delete ret.isRead;
+    // İstifadəçi interfeysi üçün decrypted məzmunu content kimi təqdim et
+    ret.content = ret.decryptedContent;
+    // Orijinal content saxlanmır (pre-save silinir)
+    delete ret.content; // redundansı qarşısını almaq üçün əvvəlki xam content sahəsini sil
+    ret.content = ret.decryptedContent;
     delete ret.__v;
     return ret;
   }

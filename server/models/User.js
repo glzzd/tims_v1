@@ -42,16 +42,20 @@ const userSchema = new mongoose.Schema({
       canAddUser: false,
       canAddEmployee: false,
       canMessageAllGroups: false,
-      canMessageInstitutionGroups: true,
-      canReadAllUsers: true,
-      canUpdateAllUsers: true,
-      canDeleteUsers: true,
-      canWriteAllUsers: true,
-      canReadOwnInstitutionUsers: true,
-      canWriteOwnInstitutionUsers: true,
-      canUpdateOwnInstitutionUsers: true,
-      canDeleteOwnInstitutionUsers: true,
-      canMessageDirect: true
+      canMessageInstitutionGroups: false,
+      canReadAllGroups: false,
+      canWriteAllGroups: false,
+      canReadInstitutionGroups: false,
+      canWriteInstitutionGroups: false,
+      canReadAllUsers: false,
+      canUpdateAllUsers: false,
+      canDeleteUsers: false,
+      canWriteAllUsers: false,
+      canReadOwnInstitutionUsers: false,
+      canWriteOwnInstitutionUsers: false,
+      canUpdateOwnInstitutionUsers: false,
+      canDeleteOwnInstitutionUsers: false,
+      canMessageDirect: false
     }
   }
 }, {

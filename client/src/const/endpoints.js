@@ -31,9 +31,9 @@ export const endpoints = {
     directMessage: "/groups/messages/direct",
     directHistory: (employeeId) => `/groups/messages/direct/${employeeId}`,
     messages: (groupId) => `/groups/${groupId}/messages`,
+    updateMessage: (messageId) => `/groups/messages/${messageId}`,
     messagesSearch: (groupId) => `/groups/${groupId}/messages/search`,
-    unreadCount: (groupId) => `/groups/${groupId}/messages/unread-count`,
-    markMessageRead: (messageId) => `/groups/messages/${messageId}/read`,
+    // unread/mark-read funksiyaları deaktiv edilib
     logs: `/groups/messages/logs`,
     addMember: (groupId) => `/groups/${groupId}/members`,
     removeMember: (groupId) => `/groups/${groupId}/members`,

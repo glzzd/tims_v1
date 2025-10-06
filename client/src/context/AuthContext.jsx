@@ -118,6 +118,12 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('user');
       setUser(null);
       setIsAuthenticated(false);
+      // Redirect to login reliably from context
+      try {
+        if (typeof window.__navigate === 'function') {
+          window.__navigate('/login', { replace: true });
+        }
+      } catch (_) {}
     }
   };
 

@@ -166,7 +166,7 @@ const MessagingPage = () => {
         if (!selectedInstitutionId) throw new Error('Qurum seçin');
         res = await postRequests.sendInstitutionMessage(selectedInstitutionId, { content });
       } else if (mode === 'direct') {
-        if (!selectedEmployeeId) throw new Error('Çalışan seçin');
+        if (!selectedEmployeeId) throw new Error('Əməkdaş seçin');
         res = await postRequests.sendDirectMessage({ employeeId: selectedEmployeeId, content });
       } else if (mode === 'group') {
         if (!selectedGroupId) throw new Error('Grup seçin');

@@ -14,7 +14,8 @@ const {
   markMessageReadValidation,
   searchMessageValidation,
   sendInstitutionMessageValidation,
-  sendDirectMessageValidation
+  sendDirectMessageValidation,
+  updateMessageValidation
 } = require('../validations/group.validation');
 const { validate } = require('../middlewares/validation');
 const auth = require('../middlewares/auth');
@@ -48,6 +49,7 @@ router.get('/:id/messages', groupIdValidation, validate, GroupController.getGrou
 router.get('/:id/messages/search', searchMessageValidation, validate, GroupController.searchMessagesInGroup);
 router.get('/:id/messages/unread-count', groupIdValidation, validate, GroupController.getUnreadMessageCount);
 router.put('/messages/:messageId/read', markMessageReadValidation, validate, GroupController.markMessageAsRead);
+router.put('/messages/:messageId', updateMessageValidation, validate, GroupController.updateMessage);
 
 // Kuruma toplu mesaj və bir işçiyə Birbaşa mesaj
 router.post('/institution/:institutionId/messages', sendInstitutionMessageValidation, validate, GroupController.sendInstitutionMessage);

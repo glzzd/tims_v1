@@ -5,7 +5,23 @@ const messages = require('../validations/messages');
 // Qrup yaratma
 const createGroup = async (req, res) => {
     try {
-      const group = await GroupService.createGroup(req.body, req.user.userId);
+      const requester = req.user;
+      const isSuper = requester?.permissions?.isSuperAdmin === true;
+      const canWriteAll = requester?.permissions?.canWriteAllGroups === true;
+      const canWriteInst = requester?.permissions?.canWriteInstitutionGroups === true;
+
+      if (!isSuper && !canWriteAll && !canWriteInst) {
+        return res.status(403).json({ success: false, message: messages.UNAUTHORIZED });
+      }
+
+      // If only institution-level writer, enforce same institution
+      if (!isSuper && !canWriteAll && canWriteInst) {
+        if (!requester.institution || String(requester.institution) !== String(req.body.institution || '')) {
+          return res.status(403).json({ success: false, message: messages.UNAUTHORIZED });
+        }
+      }
+
+      const group = await GroupService.createGroup(req.body, requester.userId);
       res.status(201).json({
         success: true,
         message: messages.GROUP_CREATED,
@@ -40,11 +56,27 @@ const getMessageLogs = async (req, res) => {
 // Bütün qrupları getir
 const getAllGroups = async (req, res) => {
     try {
+      const requester = req.user;
       const { page = 1, limit = 10, institution } = req.query;
+
+      const isSuper = requester?.permissions?.isSuperAdmin === true;
+      const canReadAll = requester?.permissions?.canReadAllGroups === true;
+      const canReadInst = requester?.permissions?.canReadInstitutionGroups === true;
+
+      if (!isSuper && !canReadAll && !canReadInst) {
+        return res.status(403).json({ success: false, message: messages.UNAUTHORIZED });
+      }
+
+      // If only institution-level reader, restrict institution to requester’s institution
+      const effectiveInstitution = (!isSuper && !canReadAll && canReadInst)
+        ? (requester.institution || null)
+        : (institution || null);
+
       const result = await GroupService.getAllGroups(
         parseInt(page),
         parseInt(limit),
-        institution
+        effectiveInstitution,
+        requester
       );
       
       res.status(200).json({
@@ -80,10 +112,26 @@ const getGroupById = async (req, res) => {
 // Qrup yenilə
 const updateGroup = async (req, res) => {
     try {
+      const requester = req.user;
+      const isSuper = requester?.permissions?.isSuperAdmin === true;
+      const canWriteAll = requester?.permissions?.canWriteAllGroups === true;
+      const canWriteInst = requester?.permissions?.canWriteInstitutionGroups === true;
+
+      if (!isSuper && !canWriteAll && !canWriteInst) {
+        return res.status(403).json({ success: false, message: messages.UNAUTHORIZED });
+      }
+
+      if (!isSuper && !canWriteAll && canWriteInst) {
+        const current = await GroupService.getGroupById(req.params.id);
+        if (!requester.institution || String(requester.institution) !== String(current?.institution?._id || current?.institution || '')) {
+          return res.status(403).json({ success: false, message: messages.UNAUTHORIZED });
+        }
+      }
+
       const group = await GroupService.updateGroup(
         req.params.id,
         req.body,
-        req.user.userId
+        requester.userId
       );
       
       res.status(200).json({
@@ -103,6 +151,22 @@ const updateGroup = async (req, res) => {
 // Qrup sil
 const deleteGroup = async (req, res) => {
     try {
+      const requester = req.user;
+      const isSuper = requester?.permissions?.isSuperAdmin === true;
+      const canWriteAll = requester?.permissions?.canWriteAllGroups === true;
+      const canWriteInst = requester?.permissions?.canWriteInstitutionGroups === true;
+
+      if (!isSuper && !canWriteAll && !canWriteInst) {
+        return res.status(403).json({ success: false, message: messages.UNAUTHORIZED });
+      }
+
+      if (!isSuper && !canWriteAll && canWriteInst) {
+        const current = await GroupService.getGroupById(req.params.id);
+        if (!requester.institution || String(requester.institution) !== String(current?.institution?._id || current?.institution || '')) {
+          return res.status(403).json({ success: false, message: messages.UNAUTHORIZED });
+        }
+      }
+
       const result = await GroupService.deleteGroup(req.params.id);
       res.status(200).json({
         success: true,
@@ -120,6 +184,22 @@ const deleteGroup = async (req, res) => {
 // Üzv əlavə et
 const addMember = async (req, res) => {
     try {
+      const requester = req.user;
+      const isSuper = requester?.permissions?.isSuperAdmin === true;
+      const canWriteAll = requester?.permissions?.canWriteAllGroups === true;
+      const canWriteInst = requester?.permissions?.canWriteInstitutionGroups === true;
+
+      if (!isSuper && !canWriteAll && !canWriteInst) {
+        return res.status(403).json({ success: false, message: messages.UNAUTHORIZED });
+      }
+
+      if (!isSuper && !canWriteAll && canWriteInst) {
+        const current = await GroupService.getGroupById(req.params.id);
+        if (!requester.institution || String(requester.institution) !== String(current?.institution?._id || current?.institution || '')) {
+          return res.status(403).json({ success: false, message: messages.UNAUTHORIZED });
+        }
+      }
+
       const result = await GroupService.addMember(
         req.params.id,
         req.body.employeeId
@@ -141,6 +221,22 @@ const addMember = async (req, res) => {
 // Üzv sil
 const removeMember = async (req, res) => {
     try {
+      const requester = req.user;
+      const isSuper = requester?.permissions?.isSuperAdmin === true;
+      const canWriteAll = requester?.permissions?.canWriteAllGroups === true;
+      const canWriteInst = requester?.permissions?.canWriteInstitutionGroups === true;
+
+      if (!isSuper && !canWriteAll && !canWriteInst) {
+        return res.status(403).json({ success: false, message: messages.UNAUTHORIZED });
+      }
+
+      if (!isSuper && !canWriteAll && canWriteInst) {
+        const current = await GroupService.getGroupById(req.params.id);
+        if (!requester.institution || String(requester.institution) !== String(current?.institution?._id || current?.institution || '')) {
+          return res.status(403).json({ success: false, message: messages.UNAUTHORIZED });
+        }
+      }
+
       const result = await GroupService.removeMember(
         req.params.id,
         req.body.employeeId
@@ -162,6 +258,22 @@ const removeMember = async (req, res) => {
 // Admin əlavə et
 const addAdmin = async (req, res) => {
     try {
+      const requester = req.user;
+      const isSuper = requester?.permissions?.isSuperAdmin === true;
+      const canWriteAll = requester?.permissions?.canWriteAllGroups === true;
+      const canWriteInst = requester?.permissions?.canWriteInstitutionGroups === true;
+
+      if (!isSuper && !canWriteAll && !canWriteInst) {
+        return res.status(403).json({ success: false, message: messages.UNAUTHORIZED });
+      }
+
+      if (!isSuper && !canWriteAll && canWriteInst) {
+        const current = await GroupService.getGroupById(req.params.id);
+        if (!requester.institution || String(requester.institution) !== String(current?.institution?._id || current?.institution || '')) {
+          return res.status(403).json({ success: false, message: messages.UNAUTHORIZED });
+        }
+      }
+
       const result = await GroupService.addAdmin(
         req.params.id,
         req.body.employeeId
@@ -183,6 +295,22 @@ const addAdmin = async (req, res) => {
 // Admin sil
 const removeAdmin = async (req, res) => {
     try {
+      const requester = req.user;
+      const isSuper = requester?.permissions?.isSuperAdmin === true;
+      const canWriteAll = requester?.permissions?.canWriteAllGroups === true;
+      const canWriteInst = requester?.permissions?.canWriteInstitutionGroups === true;
+
+      if (!isSuper && !canWriteAll && !canWriteInst) {
+        return res.status(403).json({ success: false, message: messages.UNAUTHORIZED });
+      }
+
+      if (!isSuper && !canWriteAll && canWriteInst) {
+        const current = await GroupService.getGroupById(req.params.id);
+        if (!requester.institution || String(requester.institution) !== String(current?.institution?._id || current?.institution || '')) {
+          return res.status(403).json({ success: false, message: messages.UNAUTHORIZED });
+        }
+      }
+
       const result = await GroupService.removeAdmin(
         req.params.id,
         req.body.employeeId
@@ -220,6 +348,22 @@ const getEmployeeGroups = async (req, res) => {
 // Kuruma görə qrupları getir
 const getGroupsByInstitution = async (req, res) => {
     try {
+      const requester = req.user;
+      const isSuper = requester?.permissions?.isSuperAdmin === true;
+      const canReadAll = requester?.permissions?.canReadAllGroups === true;
+      const canReadInst = requester?.permissions?.canReadInstitutionGroups === true;
+
+      if (!isSuper && !canReadAll && !canReadInst) {
+        return res.status(403).json({ success: false, message: messages.UNAUTHORIZED });
+      }
+
+      // If only institution-level reader, enforce same institution
+      if (!isSuper && !canReadAll && canReadInst) {
+        if (!requester.institution || String(requester.institution) !== String(req.params.institutionId || '')) {
+          return res.status(403).json({ success: false, message: messages.UNAUTHORIZED });
+        }
+      }
+
       const groups = await GroupService.getGroupsByInstitution(req.params.institutionId);
       res.status(200).json({
         success: true,
@@ -252,10 +396,23 @@ const getInstitutionMessageCount = async (req, res) => {
 // Qrup axtarışı
 const searchGroups = async (req, res) => {
     try {
+      const requester = req.user;
       const { search, institution, page = 1, limit = 10 } = req.query;
+
+      const isSuper = requester?.permissions?.isSuperAdmin === true;
+      const canReadAll = requester?.permissions?.canReadAllGroups === true;
+      const canReadInst = requester?.permissions?.canReadInstitutionGroups === true;
+
+      if (!isSuper && !canReadAll && !canReadInst) {
+        return res.status(403).json({ success: false, message: messages.UNAUTHORIZED });
+      }
+
+      const effectiveInstitution = (!isSuper && !canReadAll && canReadInst)
+        ? (requester.institution || null)
+        : (institution || null);
       const result = await GroupService.searchGroups(
         search,
-        institution,
+        effectiveInstitution,
         parseInt(page),
         parseInt(limit)
       );
@@ -332,7 +489,7 @@ const getGroupMessages = async (req, res) => {
       const { page = 1, limit = 50 } = req.query;
       const result = await GroupService.getGroupMessages(
         req.params.id,
-        req.user.userId, // Bu Employee ID olmalı
+        req.user,
         parseInt(page),
         parseInt(limit)
       );
@@ -353,23 +510,8 @@ const getGroupMessages = async (req, res) => {
 
 // Mesajı oxunmuş olaraq işarələ
 const markMessageAsRead = async (req, res) => {
-    try {
-      const result = await GroupService.markMessageAsRead(
-        req.params.messageId,
-        req.user.userId // Bu Employee ID olmalı
-      );
-      
-      res.status(200).json({
-        success: true,
-        message: result.message
-      });
-    } catch (error) {
-      const statusCode = error.message === messages.MESSAGE_NOT_FOUND ? 404 : 400;
-      res.status(statusCode).json({
-        success: false,
-        message: error.message
-      });
-    }
+    // İstək üzrə: Mesajı oxunmuş kimi işarələmə funksiyası deaktiv edildi
+    return res.status(403).json({ success: false, message: messages.UNAUTHORIZED });
   };
 
 // Qrupda mesaj axtarışı
@@ -378,7 +520,7 @@ const searchMessagesInGroup = async (req, res) => {
       const { search } = req.query;
       const messages = await GroupService.searchMessagesInGroup(
         req.params.id,
-        req.user.userId, // Bu Employee ID olmalı
+        req.user,
         search
       );
       
@@ -395,25 +537,9 @@ const searchMessagesInGroup = async (req, res) => {
     }
   };
 
-// Oxunmamış mesaj sayını getir
+// Oxunmamış mesaj sayını getir — deaktiv edildi
 const getUnreadMessageCount = async (req, res) => {
-    try {
-      const result = await GroupService.getUnreadMessageCount(
-        req.params.id,
-        req.user.userId // Bu Employee ID olmalı
-      );
-      
-      res.status(200).json({
-        success: true,
-        data: result
-      });
-    } catch (error) {
-      const statusCode = error.message === messages.GROUP_NOT_FOUND ? 404 : 400;
-      res.status(statusCode).json({
-        success: false,
-        message: error.message
-      });
-    }
+    return res.status(200).json({ success: true, data: { unreadCount: 0 } });
   };
 
 // Cari istifadəçinin qruplarını getir
@@ -459,6 +585,23 @@ const getDirectMessages = async (req, res) => {
     }
   };
 
+// Mesajı yenilə
+const updateMessage = async (req, res) => {
+  try {
+    const updated = await GroupService.updateMessage(
+      req.params.messageId,
+      req.user,
+      req.body.content
+    );
+    res.status(200).json({ success: true, message: messages.MESSAGE_UPDATED, data: updated });
+  } catch (error) {
+    const notFound = error.message === messages.MESSAGE_NOT_FOUND;
+    const accessDenied = error.message === messages.GROUP_ACCESS_DENIED || error.message === messages.MESSAGE_ACCESS_DENIED;
+    const statusCode = notFound ? 404 : accessDenied ? 403 : 400;
+    res.status(statusCode).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   createGroup,
   getAllGroups,
@@ -482,5 +625,6 @@ module.exports = {
   sendInstitutionMessage,
   sendDirectMessage,
   getDirectMessages,
+  updateMessage,
   getMessageLogs
 };

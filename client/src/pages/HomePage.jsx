@@ -1,161 +1,173 @@
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
-import { Home, User, Settings, BarChart3, Users, FileText } from 'lucide-react';
+import { Home, Users, MessageSquare, Building2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { getRequests } from '@/apiRequests/getRequests';
+import { Link } from 'react-router-dom';
 
 const HomePage = () => {
   const { user } = useAuth();
+  const [stats, setStats] = useState({
+    myGroups: 0,
+    myInstitutions: 0,
+    employeesInMyInstitution: 0
+  });
+  const [recentLogs, setRecentLogs] = useState([]);
 
-  const stats = [
-    {
-      title: 'Ümumi İstifadəçi',
-      value: '1,234',
-      icon: Users,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50'
-    },
-    {
-      title: 'Aktif Projeler',
-      value: '56',
-      icon: FileText,
-      color: 'text-green-600',
-      bgColor: 'bg-green-50'
-    },
-    {
-      title: 'Bu Ay Gelir',
-      value: '₺45,678',
-      icon: BarChart3,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-50'
-    }
-  ];
-
-  const quickActions = [
-    {
-      title: 'Profili Düzenle',
-      description: 'Kişisel bilgilerinizi güncelleyin',
-      icon: User,
-      action: () => console.log('Profil düzenleme sayfasına git')
-    },
-    {
-      title: 'Ayarlar',
-      description: 'Uygulama ayarlarını yönetin',
-      icon: Settings,
-      action: () => console.log('Ayarlar sayfasına git')
-    },
-    {
-      title: 'Raporlar',
-      description: 'Detaylı raporları görüntüleyin',
-      icon: BarChart3,
-      action: () => console.log('Raporlar sayfasına git')
-    }
-  ];
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const [groupsRes, instRes] = await Promise.all([
+          getRequests.getMyGroups(),
+          getRequests.getMyInstitutions()
+        ]);
+        const myGroups = Array.isArray(groupsRes?.data?.data) ? groupsRes.data.data : [];
+        const myInsts = Array.isArray(instRes?.data?.data) ? instRes.data.data : [];
+        let empCount = 0;
+        if (myInsts[0]?.id || myInsts[0]?._id) {
+          const instId = String(myInsts[0].id || myInsts[0]._id);
+          try {
+            const empRes = await getRequests.getEmployees({ institution: instId, limit: 1 });
+            empCount = empRes?.data?.pagination?.total || empRes?.data?.pagination?.totalItems || 0;
+          } catch (_) {}
+        }
+        if (mounted) {
+          setStats({ myGroups: myGroups.length, myInstitutions: myInsts.length, employeesInMyInstitution: empCount });
+        }
+      } catch (_) {}
+      try {
+        const logsRes = await getRequests.getMessageLogs({ page: 1, limit: 5, action: 'send' });
+        const items = Array.isArray(logsRes?.data?.data) ? logsRes.data.data : [];
+        if (mounted) setRecentLogs(items);
+      } catch (_) {}
+    };
+    load();
+    return () => { mounted = false; };
+  }, []);
 
   return (
     <div className="space-y-8">
-      {/* Hoş geldin mesajı */}
+      {/* Salamlayıcı mesaj */}
       <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg p-6 text-white">
         <div className="flex items-center space-x-3">
           <Home className="h-8 w-8" />
           <div>
             <h1 className="text-2xl font-bold">
-              Hoş geldin, {user?.name || user?.email || 'İstifadəçi'}!
+              Xoş gəlmisən, {user?.name || user?.email || 'İstifadəçi'}!
             </h1>
             <p className="text-blue-100 mt-1">
-              Dashboard'ına geri döndün. Bugün nasıl gidiyor?
+              Bu panel sənin gündəlik iş axınını asanlaşdırmaq üçün hazırlanıb.
             </p>
           </div>
         </div>
       </div>
 
-      {/* İstatistikler */}
+      {/* Ümumi baxış */}
       <div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">
-          Genel Bakış
-        </h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Ümumi baxış</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {stats.map((stat) => {
-            const Icon = stat.icon;
-            return (
-              <div key={stat.title} className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">{stat.title}</p>
-                    <p className={`text-2xl font-bold ${stat.color}`}>
-                      {stat.value}
-                    </p>
-                  </div>
-                  <div className={`p-3 rounded-lg ${stat.bgColor}`}>
-                    <Icon className={`h-6 w-6 ${stat.color}`} />
-                  </div>
-                </div>
+          <div className="rounded-lg p-6 bg-blue-50">
+            <div className="flex items-center space-x-4">
+              <div className="p-3 rounded-full bg-white text-blue-600">
+                <MessageSquare className="h-6 w-6" />
               </div>
-            );
-          })}
+              <div>
+                <p className="text-sm text-gray-600">Mənim qruplarım</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.myGroups}</p>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-lg p-6 bg-green-50">
+            <div className="flex items-center space-x-4">
+              <div className="p-3 rounded-full bg-white text-green-600">
+                <Building2 className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Mənim qurumlarım</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.myInstitutions}</p>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-lg p-6 bg-purple-50">
+            <div className="flex items-center space-x-4">
+              <div className="p-3 rounded-full bg-white text-purple-600">
+                <Users className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Qurumumdakı işçilər</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.employeesInMyInstitution}</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Hızlı İşlemler */}
+      {/* Tez hərəkətlər */}
       <div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">
-          Hızlı İşlemler
-        </h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Tez hərəkətlər</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {quickActions.map((action) => {
-            const Icon = action.icon;
-            return (
-              <div key={action.title} className="bg-white rounded-lg shadow p-6 hover:shadow-md transition-shadow">
-                <div className="flex items-start space-x-4">
-                  <div className="p-2 bg-gray-100 rounded-lg">
-                    <Icon className="h-5 w-5 text-gray-600" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900 mb-1">
-                      {action.title}
-                    </h3>
-                    <p className="text-sm text-gray-600 mb-3">
-                      {action.description}
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={action.action}
-                      className="w-full"
-                    >
-                      Git
-                    </Button>
-                  </div>
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-6">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="p-3 rounded-full bg-blue-50 text-blue-600">
+                  <MessageSquare className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-1">Mesajlaşma</h3>
+                  <p className="text-sm text-gray-600 mb-3">Qruplara və işçilərə mesaj göndər</p>
+                  <Link to="/messaging"><Button variant="outline" size="sm" className="w-full">Aç</Button></Link>
                 </div>
               </div>
-            );
-          })}
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-6">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="p-3 rounded-full bg-green-50 text-green-600">
+                  <Users className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-1">İşçilər</h3>
+                  <p className="text-sm text-gray-600 mb-3">Qurum üzrə işçi siyahısı</p>
+                  <Link to="/employees"><Button variant="outline" size="sm" className="w-full">Aç</Button></Link>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-6">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="p-3 rounded-full bg-purple-50 text-purple-600">
+                  <MessageSquare className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-1">Qruplar</h3>
+                  <p className="text-sm text-gray-600 mb-3">Mesaj qruplarını idarə et</p>
+                  <Link to="/messaging"><Button variant="outline" size="sm" className="w-full">Aç</Button></Link>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Son Aktiviteler */}
+      {/* Son aktivlik */}
       <div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">
-          Son Aktiviteler
-        </h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Son aktivlik</h2>
         <div className="bg-white rounded-lg shadow">
           <div className="p-6">
             <div className="space-y-4">
-              {[
-                { action: 'Profil güncellendi', time: '2 saat önce', type: 'update' },
-                { action: 'Yeni proje oluşturuldu', time: '5 saat önce', type: 'create' },
-                { action: 'Rapor indirildi', time: '1 gün önce', type: 'download' },
-                { action: 'Ayarlar değiştirildi', time: '2 gün önce', type: 'settings' }
-              ].map((activity, index) => (
-                <div key={index} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
+              {recentLogs.length === 0 && (
+                <p className="text-sm text-gray-500">Son aktivlik tapılmadı.</p>
+              )}
+              {recentLogs.map((log) => (
+                <div key={log._id || log.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
                   <div className="flex items-center space-x-3">
-                    <div className={`w-2 h-2 rounded-full ${
-                      activity.type === 'update' ? 'bg-blue-500' :
-                      activity.type === 'create' ? 'bg-green-500' :
-                      activity.type === 'download' ? 'bg-purple-500' :
-                      'bg-gray-500'
-                    }`}></div>
-                    <span className="text-sm text-gray-900">{activity.action}</span>
+                    <div className={`w-2 h-2 rounded-full ${log.action === 'send' ? 'bg-blue-500' : log.action === 'delivered' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                    <span className="text-sm text-gray-900">{log.type === 'direct' ? 'Birbaşa mesaj' : log.type === 'group' ? 'Qrup mesajı' : 'Qurum mesajı'}</span>
                   </div>
-                  <span className="text-xs text-gray-500">{activity.time}</span>
+                  <span className="text-xs text-gray-500">{new Date(log.createdAt || Date.now()).toLocaleString()}</span>
                 </div>
               ))}
             </div>

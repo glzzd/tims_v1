@@ -71,12 +71,29 @@ class GroupService {
   }
 
   // Bütün qrupları getir
-  async getAllGroups(page = 1, limit = 10, institutionId = null) {
+  async getAllGroups(page = 1, limit = 10, institutionId = null, actorUser = null) {
     try {
       const skip = (page - 1) * limit;
       const query = { isActive: true };
       
-      if (institutionId) {
+      // Permission-aware scoping: if actorUser provided and does not have global read,
+      // restrict to actor's institution regardless of provided institutionId
+      if (actorUser) {
+        const isSuper = actorUser?.permissions?.isSuperAdmin === true;
+        const canReadAll = actorUser?.permissions?.canReadAllGroups === true;
+        const canReadInst = actorUser?.permissions?.canReadInstitutionGroups === true;
+
+        if (!isSuper && !canReadAll && canReadInst) {
+          if (actorUser.institution) {
+            query.institution = actorUser.institution;
+          } else {
+            // No institution -> no results for institution-scoped readers
+            query.institution = null;
+          }
+        } else if (institutionId) {
+          query.institution = institutionId;
+        }
+      } else if (institutionId) {
         query.institution = institutionId;
       }
 
@@ -471,7 +488,7 @@ class GroupService {
     if (!institution) throw new Error(messages.INSTITUTION_NOT_FOUND);
     if (!institution.isActive) throw new Error(messages.INSTITUTION_INACTIVE);
 
-      const isSuperadmin = authUser?.permissions?.isSuperAdmin === true;
+      const isSuperadmin = Boolean(authUser?.permissions?.isSuperAdmin);
       const isAdminOfInstitution = institution.responsiblePerson && String(institution.responsiblePerson) === String(authUser.userId);
     const hasPermission = isSuperadmin || isAdminOfInstitution || authUser.permissions?.canMessageInstitutionGroups;
     if (!hasPermission) throw new Error(messages.UNAUTHORIZED);
@@ -642,10 +659,10 @@ class GroupService {
     const institution = employee.institution;
     if (!institution || !institution.isActive) throw new Error(messages.INSTITUTION_INACTIVE);
 
-    const messages = await DirectMessage.findByEmployeeForActor(employeeId, actorUserId, page, limit);
+    const directMessages = await DirectMessage.findByEmployeeForActor(employeeId, actorUserId, page, limit);
     const total = await DirectMessage.countDocuments({ receiver: employeeId, actorUserId, isDeleted: false });
     return {
-      messages,
+      messages: directMessages,
       pagination: {
         currentPage: parseInt(page),
         totalPages: Math.ceil(total / parseInt(limit)),
@@ -655,28 +672,48 @@ class GroupService {
     };
   }
 
-  // Qrup mesajlarını getir
-  async getGroupMessages(groupId, employeeId, page = 1, limit = 50) {
+  // Qrup mesajlarını getir (actor-based permission overrides)
+  async getGroupMessages(groupId, authUser, page = 1, limit = 50) {
     try {
-      const group = await Group.findById(groupId);
+      const group = await Group.findById(groupId).populate('institution', 'responsiblePerson');
       if (!group) {
         throw new Error(messages.GROUP_NOT_FOUND);
       }
 
-      if (!group.isMember(employeeId)) {
+      // Permission overrides: superadmin, institution responsible, or any group-level access (read/write/message)
+      const isSuperadmin = authUser?.permissions?.isSuperAdmin === true;
+      const isResponsible = group.institution && group.institution.responsiblePerson && String(group.institution.responsiblePerson) === String(authUser?.userId);
+
+      // Global group access (any of read/write/message)
+      const globalAccess = Boolean(
+        authUser?.permissions?.canReadAllGroups ||
+        authUser?.permissions?.canWriteAllGroups ||
+        authUser?.permissions?.canMessageAllGroups
+      );
+
+      // Institution-scoped group access (any of read/write/message) with institution match
+      const sameInstitution = String(authUser?.institution || '') === String(group.institution?._id || group.institution || '');
+      const institutionAccess = sameInstitution && Boolean(
+        authUser?.permissions?.canReadInstitutionGroups ||
+        authUser?.permissions?.canWriteInstitutionGroups ||
+        authUser?.permissions?.canMessageInstitutionGroups
+      );
+
+      const hasAccess = isSuperadmin || isResponsible || globalAccess || institutionAccess;
+      if (!hasAccess) {
         throw new Error(messages.GROUP_ACCESS_DENIED);
       }
 
-      const messages = await Message.findByGroup(groupId, page, limit);
+      const groupMessages = await Message.findByGroup(groupId, page, limit);
       const total = await Message.countDocuments({ group: groupId, isDeleted: false });
 
       return {
-        messages,
+        messages: groupMessages,
         pagination: {
-          currentPage: page,
-          totalPages: Math.ceil(total / limit),
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(total / parseInt(limit)),
           totalItems: total,
-          itemsPerPage: limit
+          itemsPerPage: parseInt(limit)
         }
       };
     } catch (error) {
@@ -703,20 +740,89 @@ class GroupService {
     }
   }
 
-  // Qrupda mesaj axtarışı
-  async searchMessagesInGroup(groupId, employeeId, searchTerm) {
+  // Qrupda mesaj axtarışı (actor-based permission overrides)
+  async searchMessagesInGroup(groupId, authUser, searchTerm) {
     try {
-      const group = await Group.findById(groupId);
+      const group = await Group.findById(groupId).populate('institution', 'responsiblePerson');
       if (!group) {
         throw new Error(messages.GROUP_NOT_FOUND);
       }
 
-      if (!group.isMember(employeeId)) {
+      // Permission overrides: superadmin, institution responsible, or any group-level access (read/write/message)
+      const isSuperadmin = Boolean(authUser?.permissions?.isSuperAdmin);
+      const isResponsible = group.institution && group.institution.responsiblePerson && String(group.institution.responsiblePerson) === String(authUser?.userId);
+
+      const globalAccess = Boolean(
+        authUser?.permissions?.canReadAllGroups ||
+        authUser?.permissions?.canWriteAllGroups ||
+        authUser?.permissions?.canMessageAllGroups
+      );
+
+      const sameInstitution = String(authUser?.institution || '') === String(group.institution?._id || group.institution || '');
+      const institutionAccess = sameInstitution && Boolean(
+        authUser?.permissions?.canReadInstitutionGroups ||
+        authUser?.permissions?.canWriteInstitutionGroups ||
+        authUser?.permissions?.canMessageInstitutionGroups
+      );
+
+      const hasAccess = isSuperadmin || isResponsible || globalAccess || institutionAccess;
+      if (!hasAccess) {
         throw new Error(messages.GROUP_ACCESS_DENIED);
       }
 
-      const messages = await Message.searchInGroup(groupId, searchTerm);
-      return messages;
+      const groupMessages = await Message.searchInGroup(groupId, searchTerm);
+      return groupMessages;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Mesajı yenilə (actor-based permission: superadmin/responsible/write access)
+  async updateMessage(messageId, authUser, newContent) {
+    try {
+      const message = await Message.findById(messageId).populate('group', 'institution isActive').populate('sender', 'firstName lastName email');
+      if (!message) {
+        throw new Error(messages.MESSAGE_NOT_FOUND);
+      }
+
+      const group = message.group ? await Group.findById(message.group._id || message.group) .populate('institution', 'responsiblePerson') : null;
+      if (!group) {
+        throw new Error(messages.GROUP_NOT_FOUND);
+      }
+      if (!group.isActive) {
+        throw new Error(messages.GROUP_INACTIVE);
+      }
+
+      const isSuperadmin = Boolean(authUser?.permissions?.isSuperAdmin);
+      const isResponsible = group.institution && group.institution.responsiblePerson && String(group.institution.responsiblePerson) === String(authUser?.userId);
+
+      const globalWrite = Boolean(authUser?.permissions?.canWriteAllGroups);
+      const sameInstitution = String(authUser?.institution || '') === String(group.institution?._id || group.institution || '');
+      const institutionWrite = sameInstitution && Boolean(authUser?.permissions?.canWriteInstitutionGroups);
+
+      const hasAccess = isSuperadmin || isResponsible || globalWrite || institutionWrite;
+      if (!hasAccess) {
+        throw new Error(messages.GROUP_ACCESS_DENIED);
+      }
+
+      // Log action before update
+      try {
+        await logMessageAction({
+          type: 'group',
+          action: 'update',
+          actorUserId: authUser.userId,
+          sender: message.sender?._id || message.sender,
+          group: group._id,
+          institution: group.institution?._id || group.institution,
+          content: newContent
+        });
+      } catch (_) {}
+
+      await message.updateContent(newContent);
+      const updated = await Message.findById(messageId)
+        .populate('sender', 'firstName lastName email')
+        .populate('replyTo', 'decryptedContent sender');
+      return updated;
     } catch (error) {
       throw error;
     }

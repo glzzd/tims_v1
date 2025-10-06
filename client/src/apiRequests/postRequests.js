@@ -39,8 +39,10 @@ apiClient.interceptors.response.use(
       } catch (_) {
         window.location.href = '/login';
       }
+      // Do not show global toast for 401 (expected on logout or expired sessions)
+      return Promise.reject(error);
     }
-    // Global hata bildirimi
+    // Global hata bildirimi (skip 401 above)
     const msg = error?.response?.data?.message || error?.message || 'İstək xətası';
     try { window.__showToast && window.__showToast({ type: 'error', title: 'Xəta', message: msg }); } catch (_) {}
     return Promise.reject(error);
@@ -60,6 +62,7 @@ export const postRequests = {
   sendInstitutionMessage: (institutionId, data) => apiClient.post(endpoints.groups.institutionMessage(institutionId), data),
   sendDirectMessage: (data) => apiClient.post(endpoints.groups.directMessage, data),
   sendGroupMessage: (groupId, data) => apiClient.post(endpoints.groups.sendMessage(groupId), data),
+  updateGroupMessage: (messageId, data) => apiClient.put(endpoints.groups.updateMessage(messageId), data),
   // Employees
   createEmployee: (data) => apiClient.post(endpoints.employees.create, data),
   updateEmployee: (id, data) => apiClient.put(endpoints.employees.update(id), data),
@@ -78,6 +81,5 @@ export const postRequests = {
   addGroupMember: (groupId, data) => apiClient.post(endpoints.groups.addMember(groupId), data),
   removeGroupMember: (groupId, data) => apiClient.delete(endpoints.groups.removeMember(groupId), { data }),
   addGroupAdmin: (groupId, data) => apiClient.post(endpoints.groups.addAdmin(groupId), data),
-  removeGroupAdmin: (groupId, data) => apiClient.delete(endpoints.groups.removeAdmin(groupId), { data }),
-  markMessageAsRead: (messageId) => apiClient.put(endpoints.groups.markMessageRead(messageId))
+  removeGroupAdmin: (groupId, data) => apiClient.delete(endpoints.groups.removeAdmin(groupId), { data })
 };

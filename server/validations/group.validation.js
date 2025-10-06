@@ -205,6 +205,19 @@ const sendDirectMessageValidation = [
     .trim()
 ];
 
+// Mesaj yeniləmə validation
+const updateMessageValidation = [
+  param('messageId')
+    .isMongoId()
+    .withMessage('Düzgün mesaj ID-si daxil edin'),
+  body('content')
+    .notEmpty()
+    .withMessage('Mesaj məzmunu tələb olunur')
+    .isLength({ min: 1, max: 5000 })
+    .withMessage('Mesaj məzmunu 1-5000 simvol arasında olmalıdır')
+    .trim()
+];
+
 // Mesaj oxuma validation
 const markMessageReadValidation = [
   param('messageId')
@@ -248,5 +261,6 @@ module.exports = {
   markMessageReadValidation,
   searchMessageValidation,
   sendInstitutionMessageValidation,
-  sendDirectMessageValidation
+  sendDirectMessageValidation,
+  updateMessageValidation
 };

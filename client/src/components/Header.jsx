@@ -27,10 +27,17 @@ const Header = ({ onMenuToggle, showMenuButton = false }) => {
                 <Menu className="h-5 w-5" />
               </Button>
             )}
-            <Link to={isAuthenticated ? '/home' : '/'} className={`font-bold text-gray-900 hover:text-gray-700 transition-colors ${
-              isAuthenticated ? 'text-xl' : 'text-2xl'
-            }`}>
-              {isAuthenticated ? 'Dashboard' : 'MyApp'}
+            <Link
+              to={isAuthenticated ? '/home' : '/'}
+              className={`font-bold text-gray-900 hover:text-gray-700 transition-colors ${
+                isAuthenticated ? '' : 'text-2xl'
+              }`}
+            >
+              {isAuthenticated ? (
+                <img src="/ondis-logo.png" alt="Ondis Logo" className="h-8 w-auto" />
+              ) : (
+                'MyApp'
+              )}
             </Link>
           </div>
           {isAuthenticated && (
@@ -44,7 +51,7 @@ const Header = ({ onMenuToggle, showMenuButton = false }) => {
               )}
               <Link to="/messaging" className="text-sm font-medium text-gray-700 hover:text-gray-900">Mesajlaşma</Link>
               {(user?.permissions?.isSuperAdmin === true || user?.permissions?.canAddEmployee === true) && (
-                <Link to="/employees" className="text-sm font-medium text-gray-700 hover:text-gray-900">Çalışanlar</Link>
+                <Link to="/employees" className="text-sm font-medium text-gray-700 hover:text-gray-900">Əməkdaşlar</Link>
               )}
               {(user?.permissions?.isSuperAdmin === true || user?.permissions?.canAddAdmin === true) && (
                 <Link to="/groups" className="text-sm font-medium text-gray-700 hover:text-gray-900">Gruplar</Link>
@@ -59,7 +66,7 @@ const Header = ({ onMenuToggle, showMenuButton = false }) => {
                 <div className="hidden sm:flex items-center space-x-2">
                   <User className="h-5 w-5 text-gray-500" />
                   <span className="text-sm text-gray-700">
-                    Hoş geldin, {user?.name || user?.email || 'İstifadəçi'}
+                    {user?.name || user?.email || 'İstifadəçi'}
                   </span>
                 </div>
                 <Button
@@ -69,7 +76,7 @@ const Header = ({ onMenuToggle, showMenuButton = false }) => {
                   className="flex items-center space-x-2"
                 >
                   <LogOut className="h-4 w-4" />
-                  <span className="hidden sm:inline">Çıkış</span>
+                  <span className="hidden sm:inline">Çıxış</span>
                 </Button>
               </>
             ) : (

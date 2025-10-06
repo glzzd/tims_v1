@@ -2,10 +2,9 @@ import React from "react";
 
 const AppDetail = ({ appName, appDescription }) => {
   return (
-    <div className="relative z-20 text-white text-3xl font-semibold left-6 flex flex-col">
-      <span className="text-[50px] font-bold">{appName}</span>
-      <hr className="w-40" />
-      <span className="text-[20px]">{appDescription}</span>
+    <div className="ml-6 text-white">
+      <h1 className="text-[120px] font-bold">{appName}</h1>
+      <span className="bg-white/20 px-2 py-1 rounded-md text-[15px] relative top-[-25px]  ">{appDescription}</span>
     </div>
   );
 };

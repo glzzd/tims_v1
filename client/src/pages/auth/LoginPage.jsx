@@ -20,7 +20,7 @@ const LoginPage = () => {
         />
         <div className="flex flex-col">
          <AppDetail appName={import.meta.env.VITE_APP_NAME} appDescription={import.meta.env.VITE_APP_DESCRIPTION}/>
-          <div className="scale-120 h-auto object-contain translate-x-[45%] translate-y-[20%] z-10">
+          <div className="scale-100 h-auto object-contain translate-x-[45%] translate-y-[10%] z-10">
             <img src="/shape.png" alt="Shape" className="animate-floaty" />
           </div>
         </div>
@@ -29,7 +29,7 @@ const LoginPage = () => {
       <div className="flex-2 rounded-[50px_0_0_50px] bg-white flex flex-col justify-center items-center gap-10 ">
         <div className="flex flex-col w-full max-w-2xl">
           <span className="text-[#525252] font-bold text-[40px] ">
-            Hesaba daxil ol
+            Hesabınıza daxil olun
           </span>
           <span className="text-[#525252]  text-[15px]  ">
             Hesabınıza daxil olmaq üçün istifadəçi məlumatlarını daxil edin
@@ -90,7 +90,7 @@ const LoginPage = () => {
               </div>
             </div>
 
-            <div className="flex items-center justify-between text-sm">
+            {/* <div className="flex items-center justify-between text-sm">
               <label className="flex items-center space-x-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -104,7 +104,7 @@ const LoginPage = () => {
               >
                 Şifrənizi unutmusunuz?
               </Link>
-            </div>
+            </div> */}
 
             <Button
               type="submit"

@@ -60,6 +60,10 @@ const UsersPage = () => {
     canAddEmployee: false,
     canMessageAllGroups: false,
     canMessageInstitutionGroups: true,
+    canReadAllGroups: false,
+    canWriteAllGroups: false,
+    canReadInstitutionGroups: true,
+    canWriteInstitutionGroups: false,
     canReadAllUsers: true,
     canUpdateAllUsers: true,
     canDeleteUsers: true,
@@ -77,6 +81,10 @@ const UsersPage = () => {
     canAddEmployee: 'İşçi əlavə et',
     canMessageAllGroups: 'Bütün qruplara mesaj',
     canMessageInstitutionGroups: 'Qurum qruplarına mesaj',
+    canReadAllGroups: 'Bütün qrupları oxu',
+    canWriteAllGroups: 'Bütün qruplara yaz',
+    canReadInstitutionGroups: 'Qurum qruplarını oxu',
+    canWriteInstitutionGroups: 'Qurum qruplarına yaz',
     canReadAllUsers: 'Bütün istifadəçiləri gör',
     canUpdateAllUsers: 'Bütün istifadəçiləri redaktə et',
     canDeleteUsers: 'İstifadəçiləri sil',
@@ -309,7 +317,7 @@ const UsersPage = () => {
                   {Object.keys(defaultPermissions)
                     .filter((key) => {
                       const globalKeys = [
-                        'canReadAllUsers','canWriteAllUsers','canUpdateAllUsers','canDeleteUsers','canMessageAllGroups','isSuperAdmin'
+                        'canReadAllUsers','canWriteAllUsers','canUpdateAllUsers','canDeleteUsers','canMessageAllGroups','canReadAllGroups','canWriteAllGroups','isSuperAdmin'
                       ];
                       const isGlobal = globalKeys.includes(key);
                       return user?.permissions?.isSuperAdmin === true ? true : !isGlobal;
@@ -377,7 +385,7 @@ const UsersPage = () => {
                   {Object.keys(defaultPermissions)
                     .filter((key) => {
                       const globalKeys = [
-                        'canReadAllUsers','canWriteAllUsers','canUpdateAllUsers','canDeleteUsers','canMessageAllGroups','isSuperAdmin'
+                        'canReadAllUsers','canWriteAllUsers','canUpdateAllUsers','canDeleteUsers','canMessageAllGroups','canReadAllGroups','canWriteAllGroups','isSuperAdmin'
                       ];
                       const isGlobal = globalKeys.includes(key);
                       return user?.permissions?.isSuperAdmin === true ? true : !isGlobal;

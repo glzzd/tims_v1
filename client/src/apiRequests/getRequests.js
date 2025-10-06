@@ -39,6 +39,8 @@ apiClient.interceptors.response.use(
       } catch (_) {
         window.location.href = '/login';
       }
+      // Do not show global toast for 401 (expected on logout or expired sessions)
+      return Promise.reject(error);
     }
     const msg = error?.response?.data?.message || error?.message || 'İstək xətası';
     try { window.__showToast && window.__showToast({ type: 'error', title: 'Xəta', message: msg }); } catch (_) {}
@@ -62,7 +64,6 @@ export const getRequests = {
   getGroup: (id) => apiClient.get(endpoints.groups.get(id)),
   getGroupMessages: (groupId, params) => apiClient.get(endpoints.groups.messages(groupId), { params }),
   searchGroupMessages: (groupId, params) => apiClient.get(endpoints.groups.messagesSearch(groupId), { params }),
-  getUnreadCount: (groupId) => apiClient.get(endpoints.groups.unreadCount(groupId)),
   getInstitutionMessageCount: (institutionId) => apiClient.get(endpoints.groups.institutionMessageCount(institutionId)),
   getMessageLogs: (params) => apiClient.get(endpoints.groups.logs, { params }),
   // Employees

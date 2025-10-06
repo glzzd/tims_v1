@@ -40,7 +40,7 @@ const InstitutionsPage = () => {
     });
   }, [groupsForInstitution, groupsSearch]);
 
-  // Çalışan araması (qurum bazlı), düzenleme modu aktifken ve arama terimi değiştiğinde tetiklenir
+  // Əməkdaş araması (qurum bazlı), düzenleme modu aktifken ve arama terimi değiştiğinde tetiklenir
   useEffect(() => {
     const run = async () => {
       if (!editingGroupId) return;
@@ -372,7 +372,7 @@ const InstitutionsPage = () => {
                           {editingGroupId === (g.id || g._id) && (
                             <div className="mt-3 space-y-2">
                               <div>
-                                <label className="block text-xs text-gray-600 mb-1">Çalışan arayın ve ekleyin</label>
+                                <label className="block text-xs text-gray-600 mb-1">Əməkdaş arayın ve ekleyin</label>
                                 <Input value={employeeSearch} onChange={(e) => setEmployeeSearch(e.target.value)} placeholder="Ad, e-posta veya TIMS" />
                               </div>
                               {employeeLoading ? (
