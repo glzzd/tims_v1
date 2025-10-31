@@ -61,7 +61,7 @@ const RegisterPage = ({ onRegisterSuccess }) => {
         onRegisterSuccess();
       }
     } catch (error) {
-      setErrors({ general: 'Kayıt olurken bir hata oluştu' });
+      setErrors({ general: 'Kayıt olurken bir Xəta oluştu' });
     } finally {
       setIsLoading(false);
     }

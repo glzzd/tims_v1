@@ -1,4 +1,5 @@
 const Group = require('../models/Group');
+const crypto = require('crypto');
 const Employee = require('../models/Employee');
 const Message = require('../models/Message');
 const Institution = require('../models/Institution');
@@ -58,13 +59,478 @@ class GroupService {
         }
       }
 
+      // Güvenli API anahtarı üret
+      const apiKey = crypto.randomBytes(32).toString('hex');
+
       const group = new Group({
         ...groupData,
-        createdBy
+        createdBy,
+        apiKey
       });
 
       await group.save();
       return await this.getGroupById(group._id);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // API anahtarını döndür (rotate)
+  async rotateApiKey(groupId) {
+    try {
+      const group = await Group.findById(groupId);
+      if (!group) {
+        throw new Error(messages.GROUP_NOT_FOUND);
+      }
+      if (!group.isActive) {
+        throw new Error(messages.GROUP_INACTIVE);
+      }
+
+      // Institution mesaj limiti kontrolü
+      const institutionDoc = await Institution.findById(group.institution?._id || group.institution);
+      if (!institutionDoc) {
+        throw new Error(messages.INSTITUTION_NOT_FOUND);
+      }
+      if (!institutionDoc.isActive) {
+        throw new Error(messages.INSTITUTION_INACTIVE);
+      }
+      if (!institutionDoc.canSendMessage()) {
+        throw new Error(messages.MESSAGE_LIMIT_REACHED || messages.INSUFFICIENT_MESSAGE_LIMIT);
+      }
+
+      const newApiKey = crypto.randomBytes(32).toString('hex');
+      group.apiKey = newApiKey;
+      await group.save();
+      return { apiKey: newApiKey };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async getApiKey(groupId) {
+    try {
+      const group = await Group.findById(groupId);
+      if (!group) {
+        throw new Error(messages.GROUP_NOT_FOUND);
+      }
+      if (!group.isActive) {
+        throw new Error(messages.GROUP_INACTIVE);
+      }
+      return { apiKey: group.apiKey || null };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // API key ile kuruma veya belirli gruba mesaj gönder (external)
+  async sendInstitutionMessagesByApiKey(apiKey, payload) {
+    try {
+      const { institutionId, content, target = 'all', groupId = null } = payload;
+
+      // API key doğrulaması ve kurum kontrolü
+      const authGroup = await Group.findOne({ apiKey })
+        .populate('institution', 'timsUUID corporationIds timsAccessToken messageLimit isActive');
+      if (!authGroup) {
+        throw new Error(messages.GROUP_APIKEY_INVALID || 'API açarı etibarsızdır');
+      }
+      if (!authGroup.isActive) {
+        throw new Error(messages.GROUP_INACTIVE);
+      }
+
+      const institutionDoc = authGroup.institution;
+      if (!institutionDoc) {
+        throw new Error(messages.INSTITUTION_NOT_FOUND);
+      }
+      if (String(institutionDoc._id) !== String(institutionId)) {
+        throw new Error(messages.UNAUTHORIZED);
+      }
+      if (!institutionDoc.isActive) {
+        throw new Error(messages.INSTITUTION_INACTIVE);
+      }
+      if (!institutionDoc.canSendMessage()) {
+        throw new Error(messages.MESSAGE_LIMIT_REACHED || messages.INSUFFICIENT_MESSAGE_LIMIT);
+      }
+
+      // Belirli gruba gönderim
+      if ((target || 'all') === 'group' && groupId) {
+        const targetGroup = await Group.findById(groupId)
+          .populate('members', 'timsUsername isActive')
+          .populate('admins', 'timsUsername isActive')
+          .populate('institution', 'timsUUID corporationIds timsAccessToken');
+        if (!targetGroup) {
+          throw new Error(messages.GROUP_NOT_FOUND);
+        }
+        if (!targetGroup.isActive) {
+          throw new Error(messages.GROUP_INACTIVE);
+        }
+        if (String(targetGroup.institution?._id || targetGroup.institution) !== String(institutionDoc._id)) {
+          throw new Error(messages.UNAUTHORIZED);
+        }
+
+        // Gönderen seçimi: admin varsa adminlerden biri; yoksa üyelerden biri
+        let senderEmployeeId = null;
+        if (targetGroup.admins && targetGroup.admins.length > 0) {
+          senderEmployeeId = targetGroup.admins[0]._id || targetGroup.admins[0];
+        } else if (targetGroup.members && targetGroup.members.length > 0) {
+          senderEmployeeId = targetGroup.members[0]._id || targetGroup.members[0];
+        } else {
+          throw new Error(messages.GROUP_MEMBER_NOT_FOUND);
+        }
+
+        // Log send
+        try {
+          await logMessageAction({
+            type: 'group',
+            action: 'send',
+            actorUserId: null,
+            sender: senderEmployeeId,
+            group: targetGroup._id,
+            institution: institutionDoc._id,
+            content
+          });
+        } catch (_) {}
+
+        // Mesajı kaydet
+        const message = new Message({
+          content,
+          sender: senderEmployeeId,
+          group: targetGroup._id,
+          messageType: 'text',
+          replyTo: null
+        });
+        await message.save();
+
+        // Mesaj limiti düşür (1)
+        try {
+          await Institution.updateOne(
+            { _id: institutionDoc._id, messageLimit: { $gt: 0 } },
+            { $inc: { messageLimit: -1 } }
+          );
+        } catch (_) {}
+
+        // TIMS API gönderimi
+        try {
+          const timsUsernames = (targetGroup.members || [])
+            .filter(m => m.isActive !== false && m.timsUsername)
+            .map(m => m.timsUsername);
+
+          const envCorpIds = (process.env.CORPORATION_IDS || process.env.CORPORATION_ID || '')
+            .split(',')
+            .map(s => parseInt(s.trim(), 10))
+            .filter(n => !isNaN(n));
+
+          const corporationIds = (targetGroup.institution?.corporationIds && targetGroup.institution.corporationIds.length > 0)
+            ? targetGroup.institution.corporationIds
+            : envCorpIds;
+          const uuid = targetGroup.institution?.timsUUID || process.env.UUID;
+          const accessToken = targetGroup.institution?.timsAccessToken || process.env.accessToken;
+
+          if (timsUsernames.length > 0 && corporationIds.length > 0 && uuid && accessToken) {
+            const resp = await MessagingService.sendBotMessage({
+              users: timsUsernames,
+              corporationIds,
+              message: content,
+              notification: true
+            }, { uuid, accessToken });
+
+            const delivered = resp.statusCode >= 200 && resp.statusCode < 300;
+            try {
+              await logMessageAction({
+                type: 'group',
+                action: delivered ? 'delivered' : 'failed',
+                actorUserId: null,
+                sender: senderEmployeeId,
+                group: targetGroup._id,
+                institution: institutionDoc._id,
+                content,
+                responseCode: resp.statusCode,
+                errorMessage: delivered ? '' : (resp?.error || resp?.body || '')
+              });
+            } catch (_) {}
+          }
+        } catch (e) {
+          try {
+            await logMessageAction({
+              type: 'group',
+              action: 'failed',
+              actorUserId: null,
+              sender: senderEmployeeId,
+              group: targetGroup._id,
+              institution: institutionDoc._id,
+              content,
+              errorMessage: e && e.message ? e.message : String(e)
+            });
+          } catch (_) {}
+        }
+
+        return await Message.findById(message._id)
+          .populate('sender', 'firstName lastName email')
+          .populate('replyTo', 'decryptedContent sender');
+      }
+
+      // Kurumun tüm aktif gruplarına broadcast (TIMS üzerinden)
+      const groups = await Group.find({ institution: institutionDoc._id, isActive: true })
+        .populate('members', 'timsUsername isActive');
+
+      const timsUsernames = Array.from(new Set(
+        groups.flatMap(g => (g.members || [])
+          .filter(m => m.isActive !== false && m.timsUsername)
+          .map(m => m.timsUsername))
+      ));
+
+      const corporationIds = institutionDoc.corporationIds || [];
+      const uuid = institutionDoc.timsUUID || process.env.UUID;
+      const accessToken = institutionDoc.timsAccessToken || process.env.accessToken;
+
+      if (timsUsernames.length === 0 || corporationIds.length === 0 || !uuid || !accessToken) {
+        return { delivered: false, reason: 'Hədəf istifadəçilər və ya corporation/kimlik boşdur' };
+      }
+
+      // Gönderim öncesi log
+      try {
+        await logMessageAction({
+          type: 'institution',
+          action: 'send',
+          actorUserId: null,
+          institution: institutionDoc._id,
+          content
+        });
+      } catch (_) {}
+
+      const resp = await MessagingService.sendBotMessage({
+        users: timsUsernames,
+        corporationIds,
+        message: content,
+        notification: true
+      }, { uuid, accessToken });
+
+      const delivered = resp.statusCode >= 200 && resp.statusCode < 300;
+      try {
+        await logMessageAction({
+          type: 'institution',
+          action: delivered ? 'delivered' : 'failed',
+          actorUserId: null,
+          institution: institutionDoc._id,
+          content,
+          responseCode: resp.statusCode,
+          errorMessage: delivered ? '' : (resp?.error || resp?.body || '')
+        });
+      } catch (_) {}
+
+      // Mesaj limiti düşür (1)
+      try {
+        await Institution.updateOne(
+          { _id: institutionDoc._id, messageLimit: { $gt: 0 } },
+          { $inc: { messageLimit: -1 } }
+        );
+      } catch (_) {}
+
+      return { delivered, response: resp };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // API key ile kuruma ait tüm grup API key’lerini listele (external)
+  async getInstitutionApiKeysByApiKey(apiKey, institutionId) {
+    try {
+      const authGroup = await Group.findOne({ apiKey }).populate('institution', 'isActive');
+      if (!authGroup) {
+        throw new Error(messages.GROUP_APIKEY_INVALID || 'API açarı etibarsızdır');
+      }
+      if (!authGroup.isActive) {
+        throw new Error(messages.GROUP_INACTIVE);
+      }
+
+      const institutionDoc = authGroup.institution;
+      if (!institutionDoc) {
+        throw new Error(messages.INSTITUTION_NOT_FOUND);
+      }
+      if (String(institutionDoc._id) !== String(institutionId)) {
+        throw new Error(messages.UNAUTHORIZED);
+      }
+      if (!institutionDoc.isActive) {
+        throw new Error(messages.INSTITUTION_INACTIVE);
+      }
+
+      const groups = await Group.find(
+        { institution: institutionDoc._id, isActive: true },
+        { _id: 1, name: 1, apiKey: 1 }
+      ).lean();
+
+      return groups.map(g => ({ id: g._id, name: g.name, apiKey: g.apiKey || null }));
+    } catch (error) {
+      throw error;
+    }
+  }
+  
+  // Internal (auth-based): Kuruma ait tüm grup API key’lerini listele
+  async getInstitutionApiKeysInternal(institutionId, actorUser) {
+    try {
+      const isSuper = actorUser?.permissions?.isSuperAdmin === true;
+      const canReadInst = actorUser?.permissions?.canReadInstitutionGroups === true;
+
+      if (!isSuper && !canReadInst) {
+        throw new Error(messages.UNAUTHORIZED);
+      }
+
+      if (!isSuper) {
+        if (!actorUser.institution || String(actorUser.institution) !== String(institutionId)) {
+          throw new Error(messages.UNAUTHORIZED);
+        }
+      }
+
+      const institutionDoc = await Institution.findById(institutionId).select('isActive');
+      if (!institutionDoc) {
+        throw new Error(messages.INSTITUTION_NOT_FOUND);
+      }
+      if (!institutionDoc.isActive) {
+        throw new Error(messages.INSTITUTION_INACTIVE);
+      }
+
+      const groups = await Group.find(
+        { institution: institutionId, isActive: true },
+        { _id: 1, name: 1, apiKey: 1 }
+      ).lean();
+
+      return groups.map(g => ({ id: g._id, name: g.name, apiKey: g.apiKey || null }));
+    } catch (error) {
+      throw error;
+    }
+  }
+  // Harici uygulama için apiKey ile mesaj gönder
+  async sendMessageByApiKey(apiKey, messageData) {
+    try {
+      const group = await Group.findOne({ apiKey })
+        .populate('members', 'timsUsername isActive')
+        .populate('admins', 'timsUsername isActive')
+        .populate('institution', 'timsUUID corporationIds timsAccessToken messageLimit isActive');
+      if (!group) {
+        throw new Error(messages.GROUP_APIKEY_INVALID || 'API açarı etibarsızdır');
+      }
+      if (!group.isActive) {
+        throw new Error(messages.GROUP_INACTIVE);
+      }
+
+      // Institution mesaj limiti kontrolü
+      const institutionDoc = await Institution.findById(group.institution?._id || group.institution);
+      if (!institutionDoc) {
+        throw new Error(messages.INSTITUTION_NOT_FOUND);
+      }
+      if (!institutionDoc.isActive) {
+        throw new Error(messages.INSTITUTION_INACTIVE);
+      }
+      if (!institutionDoc.canSendMessage()) {
+        throw new Error(messages.MESSAGE_LIMIT_REACHED || messages.INSUFFICIENT_MESSAGE_LIMIT);
+      }
+
+      // Gönderen seçimi: admin varsa adminlerden biri; yoksa üyelerden biri
+      let senderEmployeeId = null;
+      if (group.admins && group.admins.length > 0) {
+        senderEmployeeId = group.admins[0]._id || group.admins[0];
+      } else if (group.members && group.members.length > 0) {
+        senderEmployeeId = group.members[0]._id || group.members[0];
+      } else {
+        throw new Error(messages.GROUP_MEMBER_NOT_FOUND);
+      }
+
+      // Log (actor yok)
+      try {
+        await logMessageAction({
+          type: 'group',
+          action: 'send',
+          actorUserId: null,
+          sender: senderEmployeeId,
+          group: group._id,
+          institution: group.institution?._id || group.institution,
+          content: messageData.content
+        });
+      } catch (_) {}
+
+      const message = new Message({
+        content: messageData.content,
+        sender: senderEmployeeId,
+        group: group._id,
+        messageType: messageData.messageType || 'text',
+        replyTo: messageData.replyTo || null
+      });
+      await message.save();
+
+      // Mesaj limiti düşür (1)
+      try {
+        await Institution.updateOne(
+          { _id: institutionDoc._id, messageLimit: { $gt: 0 } },
+          { $inc: { messageLimit: -1 } }
+        );
+      } catch (_) {}
+
+      // TIMS API gönderimi (konfigürasyon kontrolleri + failure log)
+      try {
+        const timsUsernames = (group.members || [])
+          .filter(m => m.isActive !== false && m.timsUsername)
+          .map(m => m.timsUsername);
+
+        const envCorpIds = (process.env.CORPORATION_IDS || process.env.CORPORATION_ID || '')
+          .split(',')
+          .map(s => parseInt(s.trim(), 10))
+          .filter(n => !isNaN(n));
+
+        const corporationIds = (group.institution?.corporationIds && group.institution.corporationIds.length > 0)
+          ? group.institution.corporationIds
+          : envCorpIds;
+
+        const uuid = group.institution?.timsUUID || process.env.UUID;
+        const accessToken = group.institution?.timsAccessToken || process.env.accessToken;
+
+        if (timsUsernames.length === 0) {
+          throw new Error('Aktiv TIMS istifadəçiləri tapılmadı');
+        }
+        if (!uuid || !accessToken) {
+          throw new Error('TIMS kimlik məlumatları (uuid/accessToken) çatışmır');
+        }
+        if (!corporationIds || corporationIds.length === 0) {
+          throw new Error('Korporasiya ID-ləri təyin edilməyib');
+        }
+
+        const resp = await MessagingService.sendBotMessage({
+          users: timsUsernames,
+          corporationIds,
+          message: messageData.content,
+          notification: true
+        }, { uuid, accessToken });
+        try {
+          const delivered = resp.statusCode >= 200 && resp.statusCode < 300;
+          await logMessageAction({
+            type: 'group',
+            action: delivered ? 'delivered' : 'failed',
+            actorUserId: null,
+            sender: senderEmployeeId,
+            group: group._id,
+            institution: group.institution?._id || group.institution,
+            content: messageData.content,
+            responseCode: resp.statusCode,
+            errorMessage: delivered ? '' : (resp?.error || (resp?.data && JSON.stringify(resp.data)) || '')
+          });
+        } catch (_) {}
+      } catch (e) {
+        console.warn('External TIMS message delivery failed:', e && e.message ? e.message : e);
+        try {
+          await logMessageAction({
+            type: 'group',
+            action: 'failed',
+            actorUserId: null,
+            sender: senderEmployeeId,
+            group: group._id,
+            institution: group.institution?._id || group.institution,
+            content: messageData.content,
+            errorMessage: e && e.message ? e.message : String(e)
+          });
+        } catch (_) {}
+      }
+
+      return await Message.findById(message._id)
+        .populate('sender', 'firstName lastName email')
+        .populate('replyTo', 'decryptedContent sender');
     } catch (error) {
       throw error;
     }
@@ -359,17 +825,32 @@ class GroupService {
 
   // Mesaj göndər
   async sendMessage(groupId, authUser, messageData) {
+  
+    
     try {
       const group = await Group.findById(groupId)
         .populate('members', 'timsUsername isActive')
         .populate('admins', 'timsUsername isActive')
         .populate('institution', 'timsUUID corporationIds timsAccessToken responsiblePerson');
+        console.log(group);
       if (!group) {
         throw new Error(messages.GROUP_NOT_FOUND);
       }
 
       if (!group.isActive) {
         throw new Error(messages.GROUP_INACTIVE);
+      }
+
+      // Institution mesaj limiti kontrolü
+      const institutionDoc = await Institution.findById(group.institution?._id || group.institution);
+      if (!institutionDoc) {
+        throw new Error(messages.INSTITUTION_NOT_FOUND);
+      }
+      if (!institutionDoc.isActive) {
+        throw new Error(messages.INSTITUTION_INACTIVE);
+      }
+      if (!institutionDoc.canSendMessage()) {
+        throw new Error(messages.MESSAGE_LIMIT_REACHED || messages.INSUFFICIENT_MESSAGE_LIMIT);
       }
 
       // Göndərən təyini: üzv deyilsə admin/sorumlu override
@@ -421,7 +902,15 @@ class GroupService {
 
       await message.save();
       
-      // TIMS API'ye mesaj göndərmə (best-effort)
+      // Mesaj limiti düşür (1)
+      try {
+        await Institution.updateOne(
+          { _id: institutionDoc._id, messageLimit: { $gt: 0 } },
+          { $inc: { messageLimit: -1 } }
+        );
+      } catch (_) {}
+      
+      // TIMS API'ye mesaj göndərmə (konfigürasyon kontrolleri + failure log)
       try {
         const populatedGroup = await Group.findById(groupId)
           .populate('members', 'timsUsername isActive')
@@ -431,33 +920,49 @@ class GroupService {
           .filter(m => m.isActive !== false && m.timsUsername)
           .map(m => m.timsUsername);
 
-        const corporationIds = (populatedGroup.institution?.corporationIds || []);
+        const envCorpIds = (process.env.CORPORATION_IDS || process.env.CORPORATION_ID || '')
+          .split(',')
+          .map(s => parseInt(s.trim(), 10))
+          .filter(n => !isNaN(n));
+
+        const corporationIds = (populatedGroup.institution?.corporationIds && populatedGroup.institution.corporationIds.length > 0)
+          ? populatedGroup.institution.corporationIds
+          : envCorpIds;
+
         const uuid = populatedGroup.institution?.timsUUID || process.env.UUID;
         const accessToken = populatedGroup.institution?.timsAccessToken || process.env.accessToken;
 
-        if (timsUsernames.length > 0 && corporationIds.length > 0) {
-          const resp = await MessagingService.sendBotMessage({
-            users: timsUsernames,
-            corporationIds,
-            message: messageData.content,
-            notification: true
-          }, { uuid, accessToken });
-          // Gönderim sonrası log (delivered/failed)
-          try {
-            const delivered = resp.statusCode >= 200 && resp.statusCode < 300;
-            await logMessageAction({
-              type: 'group',
-              action: delivered ? 'delivered' : 'failed',
-              actorUserId: authUser.userId,
-              sender: senderEmployeeId,
-              group: groupId,
-              institution: populatedGroup.institution?._id || populatedGroup.institution,
-              content: messageData.content,
-              responseCode: resp.statusCode,
-              errorMessage: delivered ? '' : (resp?.error || resp?.body || '')
-            });
-          } catch (_) {}
+        if (timsUsernames.length === 0) {
+          throw new Error('Aktiv TIMS istifadəçiləri tapılmadı');
         }
+        if (!uuid || !accessToken) {
+          throw new Error('TIMS kimlik məlumatları (uuid/accessToken) çatışmır');
+        }
+        if (!corporationIds || corporationIds.length === 0) {
+          throw new Error('Korporasiya ID-ləri təyin edilməyib');
+        }
+
+        const resp = await MessagingService.sendBotMessage({
+          users: timsUsernames,
+          corporationIds,
+          message: messageData.content,
+          notification: true
+        }, { uuid, accessToken });
+        // Gönderim sonrası log (delivered/failed)
+        try {
+          const delivered = resp.statusCode >= 200 && resp.statusCode < 300;
+          await logMessageAction({
+            type: 'group',
+            action: delivered ? 'delivered' : 'failed',
+            actorUserId: authUser.userId,
+            sender: senderEmployeeId,
+            group: groupId,
+            institution: populatedGroup.institution?._id || populatedGroup.institution,
+            content: messageData.content,
+            responseCode: resp.statusCode,
+            errorMessage: delivered ? '' : (resp?.error || (resp?.data && JSON.stringify(resp.data)) || '')
+          });
+        } catch (_) {}
       } catch (e) {
         console.warn('TIMS message delivery failed:', e && e.message ? e.message : e);
         try {
@@ -487,6 +992,11 @@ class GroupService {
     const institution = await Institution.findById(institutionId);
     if (!institution) throw new Error(messages.INSTITUTION_NOT_FOUND);
     if (!institution.isActive) throw new Error(messages.INSTITUTION_INACTIVE);
+
+    // Mesaj limiti kontrolü
+    if (!institution.canSendMessage()) {
+      throw new Error(messages.MESSAGE_LIMIT_REACHED || messages.INSUFFICIENT_MESSAGE_LIMIT);
+    }
 
       const isSuperadmin = Boolean(authUser?.permissions?.isSuperAdmin);
       const isAdminOfInstitution = institution.responsiblePerson && String(institution.responsiblePerson) === String(authUser.userId);
@@ -548,6 +1058,14 @@ class GroupService {
       });
     } catch (_) {}
 
+    // Mesaj limiti düşür (1)
+    try {
+      await Institution.updateOne(
+        { _id: institution._id, messageLimit: { $gt: 0 } },
+        { $inc: { messageLimit: -1 } }
+      );
+    } catch (_) {}
+
     return { delivered, response: resp };
   }
 
@@ -559,6 +1077,11 @@ class GroupService {
 
     const institution = employee.institution;
     if (!institution || !institution.isActive) throw new Error(messages.INSTITUTION_INACTIVE);
+
+      // Mesaj limiti kontrolü
+      if (!institution.canSendMessage()) {
+        throw new Error(messages.MESSAGE_LIMIT_REACHED || messages.INSUFFICIENT_MESSAGE_LIMIT);
+      }
 
       const isSuperadmin = authUser?.permissions?.isSuperAdmin === true;
       const isAdminOfInstitution = institution.responsiblePerson && String(institution.responsiblePerson) === String(authUser.userId);
@@ -646,6 +1169,14 @@ class GroupService {
         message: delivered ? `Birbaşa mesaj çatdırıldı: ${employee.firstName} ${employee.lastName}` : `Birbaşa mesaj uğursuz: ${employee.firstName} ${employee.lastName}`,
         changes: { employeeId: employee._id, institutionId: institution._id, responseCode: resp.statusCode }
       });
+    } catch (_) {}
+
+    // Mesaj limiti düşür (1)
+    try {
+      await Institution.updateOne(
+        { _id: institution._id, messageLimit: { $gt: 0 } },
+        { $inc: { messageLimit: -1 } }
+      );
     } catch (_) {}
 
     return { delivered, response: resp };

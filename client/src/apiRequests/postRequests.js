@@ -42,7 +42,7 @@ apiClient.interceptors.response.use(
       // Do not show global toast for 401 (expected on logout or expired sessions)
       return Promise.reject(error);
     }
-    // Global hata bildirimi (skip 401 above)
+    // Global Xəta bildirimi (skip 401 above)
     const msg = error?.response?.data?.message || error?.message || 'İstək xətası';
     try { window.__showToast && window.__showToast({ type: 'error', title: 'Xəta', message: msg }); } catch (_) {}
     return Promise.reject(error);
@@ -81,5 +81,7 @@ export const postRequests = {
   addGroupMember: (groupId, data) => apiClient.post(endpoints.groups.addMember(groupId), data),
   removeGroupMember: (groupId, data) => apiClient.delete(endpoints.groups.removeMember(groupId), { data }),
   addGroupAdmin: (groupId, data) => apiClient.post(endpoints.groups.addAdmin(groupId), data),
-  removeGroupAdmin: (groupId, data) => apiClient.delete(endpoints.groups.removeAdmin(groupId), { data })
+  removeGroupAdmin: (groupId, data) => apiClient.delete(endpoints.groups.removeAdmin(groupId), { data }),
+  // API key
+  rotateGroupApiKey: (groupId) => apiClient.put(endpoints.groups.rotateApiKey(groupId))
 };

@@ -20,6 +20,7 @@ app.use('/api/v1/employees', require('./routes/employeeRoutes'));
 app.use('/api/v1/institutions', require('./routes/institutionRoutes'));
 app.use('/api/v1/groups', require('./routes/groupRoutes'));
 app.use('/api/v1/users', require('./routes/userRoutes'));
+app.use('/api/v1/external', require('./routes/externalRoutes'));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

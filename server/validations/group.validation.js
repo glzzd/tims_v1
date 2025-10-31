@@ -262,5 +262,11 @@ module.exports = {
   searchMessageValidation,
   sendInstitutionMessageValidation,
   sendDirectMessageValidation,
-  updateMessageValidation
+  updateMessageValidation,
+  // Internal: Kuruma ait tüm grup API key’lerini listeleme (auth-based)
+  getInstitutionApiKeysInternalValidation: [
+    param('institutionId')
+      .isMongoId()
+      .withMessage('Düzgün qurum ID-si daxil edin')
+  ]
 };

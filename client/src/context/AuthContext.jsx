@@ -107,7 +107,7 @@ export const AuthProvider = ({ children }) => {
           await postRequests.logout();
         } catch (error) {
           console.error('Logout API error:', error);
-          // API hatası olsa bile local logout işlemini yap
+          // API Xətası olsa bile local logout işlemini yap
         }
       }
     } catch (error) {

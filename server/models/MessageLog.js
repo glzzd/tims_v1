@@ -14,7 +14,7 @@ const messageLogSchema = new mongoose.Schema({
   actorUserId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: false
   },
   sender: {
     type: mongoose.Schema.Types.ObjectId,

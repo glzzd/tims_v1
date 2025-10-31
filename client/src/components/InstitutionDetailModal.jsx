@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useRef, Fragment } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { getRequests } from '@/apiRequests/getRequests';
+import { getRequests, externalGetRequests, internalGetRequests } from '@/apiRequests/getRequests';
 import { postRequests } from '@/apiRequests/postRequests';
 import { useAuth } from '@/context/AuthContext';
 
@@ -43,9 +43,33 @@ const InstitutionDetailModal = ({ institution, onClose, onUpdated }) => {
   const [directMessageHistory, setDirectMessageHistory] = useState({});
   const [directMessageHistoryStatus, setDirectMessageHistoryStatus] = useState({});
 
+  // Groups & API key operations
+  const [groups, setGroups] = useState([]);
+  const [groupsLoading, setGroupsLoading] = useState(false);
+  const [groupsError, setGroupsError] = useState(null);
+  const [selectedGroupId, setSelectedGroupId] = useState('');
+  const [apiKeyResult, setApiKeyResult] = useState(null);
+  const [rotateStatus, setRotateStatus] = useState('');
+  const [bulkRotateStatus, setBulkRotateStatus] = useState('');
+  const [bulkRotateResults, setBulkRotateResults] = useState([]);
+  // Kurum qrup API anahtarları listeleme (external header)
+  const [listingApiKey, setListingApiKey] = useState('');
+  const [apiKeysList, setApiKeysList] = useState([]);
+  const [apiKeysLoading, setApiKeysLoading] = useState(false);
+  const [apiKeysError, setApiKeysError] = useState('');
+  const [showNewApiKey, setShowNewApiKey] = useState(false);
+
   const sanitizePlain = (text) => {
     if (!text) return '';
     return String(text).replace(/\u00A0/g, ' ').replace(/\s{3,}/g, ' ').trim();
+  };
+
+  const maskKey = (key) => {
+    if (!key) return '';
+    const s = String(key);
+    const start = s.slice(0, 8);
+    const end = s.slice(-6);
+    return `${start}…${end}`;
   };
 
   const fetchEmployeeHistory = async (employeeId) => {
@@ -102,6 +126,22 @@ const InstitutionDetailModal = ({ institution, onClose, onUpdated }) => {
     return false;
   }, [user, institutionId]);
 
+  const canListInternally = useMemo(() => {
+    const perms = user?.permissions || {};
+    const uInst = String(user?.institutionId || user?.institution || '');
+    if (user?.isSuperAdmin) return true;
+    if (perms.canReadInstitutionGroups && institutionId && uInst === institutionId) return true;
+    return false;
+  }, [user, institutionId]);
+
+  // İç yetkiler varsa otomatik listeyi getir
+  useEffect(() => {
+    if (institutionId && canListInternally) {
+      fetchInstitutionApiKeysInternal();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [institutionId, canListInternally]);
+
   useEffect(() => {
     if (!institutionId) return;
     (async () => {
@@ -147,11 +187,122 @@ const InstitutionDetailModal = ({ institution, onClose, onUpdated }) => {
     }
   };
 
+  const fetchGroups = async () => {
+    if (!institutionId) return;
+    setGroupsLoading(true);
+    setGroupsError(null);
+    try {
+      const res = await getRequests.getGroupsByInstitution(institutionId);
+      const arr = Array.isArray(res?.data?.data) ? res.data.data : [];
+      setGroups(arr);
+      // Auto-select first group for convenience
+      setSelectedGroupId(arr[0]?._id || '');
+    } catch (err) {
+      setGroupsError(err?.response?.data?.message || err.message);
+    } finally {
+      setGroupsLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
     fetchEmployees();
+    fetchGroups();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [institutionId]);
+
+  const handleRotateGroupApiKey = async () => {
+    if (!selectedGroupId) {
+      setRotateStatus('Lütfen bir qrup seçin');
+      return;
+    }
+    try {
+      setRotateStatus('Yenileniyor...');
+      setApiKeyResult(null);
+      const res = await postRequests.rotateGroupApiKey(selectedGroupId);
+      const newKey = res?.data?.data?.apiKey || '';
+      setApiKeyResult({ groupId: selectedGroupId, apiKey: newKey });
+      setListingApiKey(newKey);
+      setShowNewApiKey(false);
+      setRotateStatus('Başarıyla yenilendi');
+      try { window.__showToast && window.__showToast({ type: 'success', title: 'Başarılı', message: 'API açarı yenilendi' }); } catch (_) {}
+    } catch (err) {
+      setRotateStatus(`Hata: ${err?.response?.data?.message || err.message}`);
+    }
+  };
+
+  const handleBulkRotateApiKeys = async () => {
+    if (!groups || groups.length === 0) {
+      setBulkRotateStatus('Qrup bulunamadı');
+      return;
+    }
+    setBulkRotateStatus('Toplu yenileme başlıyor...');
+    setBulkRotateResults([]);
+    try {
+      const results = [];
+      for (const g of groups) {
+        try {
+          const res = await postRequests.rotateGroupApiKey(g._id);
+          const newKey = res?.data?.data?.apiKey || '';
+          results.push({ groupId: g._id, name: g.name, apiKey: newKey, status: 'success' });
+        } catch (err) {
+          results.push({ groupId: g._id, name: g.name, apiKey: '', status: `error: ${err?.response?.data?.message || err.message}` });
+        }
+      }
+      setBulkRotateResults(results);
+      setBulkRotateStatus('Toplu yenileme tamamlandı');
+      try { window.__showToast && window.__showToast({ type: 'success', title: 'Başarılı', message: 'Tüm gruplarda API açarı yenilendi' }); } catch (_) {}
+    } catch (err) {
+      setBulkRotateStatus(`Hata: ${err?.response?.data?.message || err.message}`);
+    }
+  };
+
+  const fetchInstitutionApiKeys = async () => {
+    if (!institutionId) return;
+    if (!listingApiKey || listingApiKey.length < 16) {
+      setApiKeysError('Lütfen geçerli bir header API açarı girin');
+      return;
+    }
+    setApiKeysLoading(true);
+    setApiKeysError('');
+    try {
+      const res = await externalGetRequests.getInstitutionApiKeys(institutionId, listingApiKey);
+      const arr = Array.isArray(res?.data?.data) ? res.data.data : [];
+      setApiKeysList(arr);
+      if (arr.length === 0) {
+        setApiKeysError('Bu kurum için qrup/API açarı bulunamadı');
+      }
+    } catch (err) {
+      setApiKeysError(err?.response?.data?.message || err.message);
+    } finally {
+      setApiKeysLoading(false);
+    }
+  };
+
+  const fetchInstitutionApiKeysInternal = async () => {
+    if (!institutionId) return;
+    setApiKeysLoading(true);
+    setApiKeysError('');
+    try {
+      const res = await internalGetRequests.getInstitutionApiKeys(institutionId);
+      const arr = Array.isArray(res?.data?.data) ? res.data.data : [];
+      setApiKeysList(arr);
+      if (arr.length === 0) {
+        setApiKeysError('Bu kurum için qrup/API açarı bulunamadı');
+      }
+    } catch (err) {
+      setApiKeysError(err?.response?.data?.message || err.message);
+    } finally {
+      setApiKeysLoading(false);
+    }
+  };
+
+  const copyText = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      try { window.__showToast && window.__showToast({ type: 'success', title: 'Kopyalandı', message: 'Metin panoya kopyalandı' }); } catch (_) {}
+    } catch (_) {}
+  };
 
   const onUserEditSubmit = async (e) => {
     e.preventDefault();
@@ -330,6 +481,121 @@ const InstitutionDetailModal = ({ institution, onClose, onUpdated }) => {
               </p>
             </div>
           </form>
+          {/* API key oluşturma (tek qrup & tüm gruplar) */}
+          <div className="mt-4 border-t pt-4">
+            <h3 className="text-sm font-semibold text-gray-800 mb-2">API açarı əməliyyatları</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Qrupu seçin</label>
+                <select className="w-full border rounded-md h-9 px-2 text-sm" value={selectedGroupId} onChange={(e) => setSelectedGroupId(e.target.value)}>
+                  {groupsLoading ? (
+                    <option value="">Yüklənir...</option>
+                  ) : groupsError ? (
+                    <option value="">{groupsError}</option>
+                  ) : (groups.length === 0 ? (
+                    <option value="">Qrup tapılmadı</option>
+                  ) : (
+                    groups.map((g) => <option key={g._id} value={g._id}>{g.name}</option>)
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button type="button" onClick={handleRotateGroupApiKey}>Seçilən qrup üçün API açarı yarat/yenilə</Button>
+                <Button type="button" variant="outline" onClick={handleBulkRotateApiKeys}>Bütün aktiv qruplar üçün yarat/yenilə</Button>
+              </div>
+              <div>
+                {rotateStatus && (
+                  <p className={`text-xs ${rotateStatus.startsWith('Hata') ? 'text-red-600' : rotateStatus === 'Yenilənir...' ? 'text-gray-600' : 'text-green-600'}`}>{rotateStatus}</p>
+                )}
+                {apiKeyResult?.apiKey && (
+                  <div className="mt-2 rounded-md border bg-gray-50 p-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-medium text-gray-700">Yeni API açarı</p>
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" variant="outline" onClick={() => setShowNewApiKey((v) => !v)}>
+                          {showNewApiKey ? 'Gizle' : 'Göster'}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => copyText(apiKeyResult.apiKey)}>Kopyala</Button>
+                      </div>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-900 break-all font-mono">
+                      {showNewApiKey ? apiKeyResult.apiKey : maskKey(apiKeyResult.apiKey)}
+                    </p>
+                    <p className="mt-1 text-[10px] text-gray-500">Not: Rotasyon sonrası header alanı otomatik güncellenir. Anahtarı güvenli saklayınız.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+            {bulkRotateStatus && <p className={`mt-2 text-xs ${bulkRotateStatus.startsWith('Hata') ? 'text-red-600' : bulkRotateStatus.includes('başlıyor') ? 'text-gray-600' : 'text-green-600'}`}>{bulkRotateStatus}</p>}
+            {bulkRotateResults.length > 0 && (
+              <div className="mt-2 border rounded-md p-3">
+                <p className="text-xs text-gray-600 mb-1">Toplu sonuçlar:</p>
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      <th className="px-2 py-1 text-left text-xs font-medium text-gray-500">Qrup</th>
+                      <th className="px-2 py-1 text-left text-xs font-medium text-gray-500">API açarı</th>
+                      <th className="px-2 py-1 text-left text-xs font-medium text-gray-500">Durum</th>
+                      <th className="px-2 py-1 text-right text-xs font-medium text-gray-500">Əməliyyat</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {bulkRotateResults.map((r) => (
+                      <tr key={r.groupId}>
+                        <td className="px-2 py-1 text-xs text-gray-900">{r.name}</td>
+                        <td className="px-2 py-1 text-xs text-gray-900 break-all">{r.apiKey || '—'}</td>
+                        <td className="px-2 py-1 text-xs text-gray-900">{r.status}</td>
+                        <td className="px-2 py-1 text-right">
+                          {r.apiKey && <Button size="sm" variant="ghost" onClick={() => copyText(r.apiKey)}>Kopyala</Button>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {/* Kurum API açarı siyahısı (external, header x-api-key) */}
+            <div className="mt-6 border rounded-md p-4 bg-white">
+              <div className='flex items-center justify-between'>
+
+              <h3 className="text-sm font-semibold text-gray-800">Qruma aid qrupların APİ açarı siyahısı</h3>
+              <div className="flex items-center gap-2">
+                  <Button type="button" onClick={fetchInstitutionApiKeysInternal} disabled={apiKeysLoading}>Göstər</Button>
+                  <Button type="button" variant="outline" onClick={() => { setApiKeysList([]); setApiKeysError(''); }}>Gizlət</Button>
+                </div>
+              </div>
+              <div className="flex items-end justify-between sm:justify-start gap-2">
+                
+                
+              </div>
+              {apiKeysError && <p className="mt-2 text-xs text-red-600">{apiKeysError}</p>}
+              {apiKeysLoading && <p className="mt-2 text-xs text-gray-600">Yükleniyor...</p>}
+              {apiKeysList.length > 0 && (
+                <div className="mt-3">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="px-2 py-1 text-left text-xs font-medium text-gray-500">Qrup</th>
+                        <th className="px-2 py-1 text-left text-xs font-medium text-gray-500">API açarı</th>
+                        <th className="px-2 py-1 text-right text-xs font-medium text-gray-500">Əməliyyat</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {apiKeysList.map((r) => (
+                        <tr key={r.id}>
+                          <td className="px-2 py-1 text-xs text-gray-900">{r.name}</td>
+                          <td className="px-2 py-1 text-xs text-gray-900 break-all">{r.apiKey || '—'}</td>
+                          <td className="px-2 py-1 text-right">
+                            {r.apiKey && <Button size="sm" variant="ghost" onClick={() => copyText(r.apiKey)}>Kopyala</Button>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
         <div className="px-6 py-4">
           <div className="mb-3 flex items-center space-x-2">

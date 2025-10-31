@@ -40,6 +40,12 @@ const groupSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
+  },
+  // Harici entegrasyon için benzersiz API anahtarı
+  apiKey: {
+    type: String,
+    unique: true,
+    index: true
   }
 }, {
   timestamps: true
@@ -74,6 +80,7 @@ groupSchema.index({ members: 1 });
 groupSchema.index({ admins: 1 });
 groupSchema.index({ isActive: 1 });
 groupSchema.index({ createdAt: -1 });
+groupSchema.index({ apiKey: 1 }, { unique: true });
 
 // Pre-save middleware
 groupSchema.pre('save', function(next) {
@@ -183,6 +190,8 @@ groupSchema.set('toJSON', {
   virtuals: true,
   transform: function(doc, ret) {
     delete ret.__v;
+    // Varsayılan dönüşümde gizle
+    if (ret.apiKey) delete ret.apiKey;
     return ret;
   }
 });

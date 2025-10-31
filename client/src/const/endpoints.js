@@ -38,7 +38,11 @@ export const endpoints = {
     addMember: (groupId) => `/groups/${groupId}/members`,
     removeMember: (groupId) => `/groups/${groupId}/members`,
     addAdmin: (groupId) => `/groups/${groupId}/admins`,
-    removeAdmin: (groupId) => `/groups/${groupId}/admins`
+    removeAdmin: (groupId) => `/groups/${groupId}/admins`,
+    // API key işlemleri
+    rotateApiKey: (groupId) => `/groups/${groupId}/apikey/rotate`,
+    // Internal: Kuruma ait tüm grup API key’lerini listele
+    institutionApiKeys: (institutionId) => `/groups/institution/${institutionId}/api-keys`
   },
   employees: {
     list: "/employees",
@@ -60,5 +64,8 @@ export const endpoints = {
     updateMessageLimit: (id) => `/institutions/${id}/message-limit`,
     types: "/institutions/types",
     create: "/institutions"
+  },
+  external: {
+    institutionApiKeys: (institutionId) => `/external/institution/${institutionId}/api-keys`
   }
 };

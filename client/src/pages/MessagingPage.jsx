@@ -169,14 +169,14 @@ const MessagingPage = () => {
         if (!selectedEmployeeId) throw new Error('Əməkdaş seçin');
         res = await postRequests.sendDirectMessage({ employeeId: selectedEmployeeId, content });
       } else if (mode === 'group') {
-        if (!selectedGroupId) throw new Error('Grup seçin');
+        if (!selectedGroupId) throw new Error('Qrup seçin');
         res = await postRequests.sendGroupMessage(selectedGroupId, { content });
       }
       setStatusMsg(`Başarılı: ${res?.data?.message || 'Mesaj gönderildi'}`);
       setContent('');
       await fetchLogs(1);
     } catch (err) {
-      setStatusMsg(`Hata: ${err?.response?.data?.message || err.message}`);
+      setStatusMsg(`Xəta: ${err?.response?.data?.message || err.message}`);
     }
   };
 

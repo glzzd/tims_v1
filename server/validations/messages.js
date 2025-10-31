@@ -34,6 +34,7 @@ const validationMessages = {
   INSTITUTION_INACTIVE: 'Qurum deaktivdir',
   MESSAGE_LIMIT_EXCEEDED: 'Mesaj limiti aşıldı',
   INSUFFICIENT_MESSAGE_LIMIT: 'Mesaj limiti kifayət etmir',
+  MESSAGE_LIMIT_REACHED: 'Mesaj limiti doldu, əlaqə saxlayın',
   RESPONSIBLE_PERSON_NOT_FOUND: 'Sorumlu şəxs tapılmadı',
   INSTITUTION_ACCESS_DENIED: 'Bu Quruma giriş icazəniz yoxdur',
   
@@ -62,6 +63,8 @@ const validationMessages = {
   GROUP_MEMBER_REMOVED: 'Üzv qrupdan çıxarıldı',
   GROUP_ADMIN_ADDED: 'Admin qrupa əlavə edildi',
   GROUP_ADMIN_REMOVED: 'Admin qrupdan çıxarıldı',
+  GROUP_APIKEY_ROTATED: 'Qrup API açarı yeniləndi',
+  GROUP_APIKEY_INVALID: 'API açarı etibarsızdır',
   
   // Mesaj mesajları
   MESSAGE_SENT: 'Mesaj göndərildi',

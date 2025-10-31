@@ -15,7 +15,8 @@ const {
   searchMessageValidation,
   sendInstitutionMessageValidation,
   sendDirectMessageValidation,
-  updateMessageValidation
+  updateMessageValidation,
+  getInstitutionApiKeysInternalValidation
 } = require('../validations/group.validation');
 const { validate } = require('../middlewares/validation');
 const auth = require('../middlewares/auth');
@@ -28,6 +29,8 @@ router.get('/search', searchGroupValidation, validate, GroupController.searchGro
 router.get('/my-groups', GroupController.getMyGroups);
 router.get('/institution/:institutionId', GroupController.getGroupsByInstitution);
 router.get('/institution/:institutionId/messages/count', GroupController.getInstitutionMessageCount);
+// Internal: Kuruma ait tüm grup API key’lerini listele (auth-based)
+router.get('/institution/:institutionId/api-keys', getInstitutionApiKeysInternalValidation, validate, GroupController.getInstitutionApiKeysInternal);
 router.get('/employee/:employeeId', GroupController.getEmployeeGroups);
 router.get('/', GroupController.getAllGroups);
 router.post('/', createGroupValidation, validate, GroupController.createGroup);
@@ -42,6 +45,9 @@ router.delete('/:id/members', removeMemberValidation, validate, GroupController.
 // Admin idarəetməsi
 router.post('/:id/admins', addAdminValidation, validate, GroupController.addAdmin);
 router.delete('/:id/admins', removeAdminValidation, validate, GroupController.removeAdmin);
+
+// API anahtarı işlemleri
+router.put('/:id/apikey/rotate', groupIdValidation, validate, GroupController.rotateApiKey);
 
 // Mesaj əməliyyatları
 router.post('/:id/messages', sendMessageValidation, validate, GroupController.sendMessage);

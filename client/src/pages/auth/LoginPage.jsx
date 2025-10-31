@@ -20,7 +20,7 @@ const LoginPage = () => {
         />
         <div className="flex flex-col">
          <AppDetail appName={import.meta.env.VITE_APP_NAME} appDescription={import.meta.env.VITE_APP_DESCRIPTION}/>
-          <div className="scale-100 h-auto object-contain translate-x-[45%] translate-y-[10%] z-10">
+          <div className="scale-100 h-auto object-contain translate-x-[75%] translate-y-[10%] z-10">
             <img src="/shape.png" alt="Shape" className="animate-floaty" />
           </div>
         </div>

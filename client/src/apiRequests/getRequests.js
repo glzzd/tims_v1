@@ -79,3 +79,19 @@ export const getRequests = {
   getInstitutionTypes: () => apiClient.get(endpoints.institutions.types),
   getInstitution: (id) => apiClient.get(endpoints.institutions.get(id))
 };
+
+// External (header-based apiKey)
+export const externalGetRequests = {
+  // Kuruma ait tüm grup API anahtarlarını getir (header: x-api-key)
+  getInstitutionApiKeys: (institutionId, apiKey) => apiClient.get(
+    endpoints.external.institutionApiKeys(institutionId),
+    { headers: { 'x-api-key': apiKey } }
+  )
+};
+
+// Internal (auth-based): Kuruma ait tüm grup API anahtarlarını getir
+export const internalGetRequests = {
+  getInstitutionApiKeys: (institutionId) => apiClient.get(
+    endpoints.groups.institutionApiKeys(institutionId)
+  )
+};

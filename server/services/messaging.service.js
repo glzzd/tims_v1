@@ -12,6 +12,8 @@ class MessagingService {
       message,
       notification
     });
+    console.log(payload);
+    
 
     const url = new URL(this.apiUrl);
     const options = {

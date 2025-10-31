@@ -87,7 +87,7 @@ const InstitutionsPage = () => {
       }));
       setRowActionStatus('Katılımcı eklendi');
     } catch (err) {
-      setRowActionStatus(`Hata: ${err?.response?.data?.message || err.message}`);
+      setRowActionStatus(`Xəta: ${err?.response?.data?.message || err.message}`);
     }
   };
 
@@ -102,7 +102,7 @@ const InstitutionsPage = () => {
       }));
       setRowActionStatus('Katılımcı çıkarıldı');
     } catch (err) {
-      setRowActionStatus(`Hata: ${err?.response?.data?.message || err.message}`);
+      setRowActionStatus(`Xəta: ${err?.response?.data?.message || err.message}`);
     }
   };
 
@@ -122,7 +122,7 @@ const InstitutionsPage = () => {
       setGroupMessageStatus(prev => ({ ...prev, [groupId]: 'Gönderildi' }));
       setGroupMessageInputs(prev => ({ ...prev, [groupId]: '' }));
     } catch (err) {
-      setGroupMessageStatus(prev => ({ ...prev, [groupId]: `Hata: ${err?.response?.data?.message || err.message}` }));
+      setGroupMessageStatus(prev => ({ ...prev, [groupId]: `Xəta: ${err?.response?.data?.message || err.message}` }));
     }
   };
 
@@ -396,7 +396,7 @@ const InstitutionsPage = () => {
 
                           {/* Grup mesajı gönderme alanı */}
                           <div className="mt-4 space-y-2">
-                            <label className="block text-xs text-gray-600 mb-1">Grup mesajı gönder</label>
+                            <label className="block text-xs text-gray-600 mb-1">Qrup mesajı göndər</label>
                             <div className="flex items-center gap-2">
                               <Input
                                 value={groupMessageInputs[g.id || g._id] || ''}
@@ -406,7 +406,7 @@ const InstitutionsPage = () => {
                               <Button size="sm" onClick={() => handleSendGroupMessage(g.id || g._id)}>Gönder</Button>
                             </div>
                             {groupMessageStatus[g.id || g._id] && (
-                              <p className={`text-xs ${String(groupMessageStatus[g.id || g._id]).startsWith('Hata') ? 'text-red-600' : groupMessageStatus[g.id || g._id] === 'gönderiliyor' ? 'text-gray-500' : 'text-green-600'}`}>{groupMessageStatus[g.id || g._id]}</p>
+                              <p className={`text-xs ${String(groupMessageStatus[g.id || g._id]).startsWith('Xəta') ? 'text-red-600' : groupMessageStatus[g.id || g._id] === 'gönderiliyor' ? 'text-gray-500' : 'text-green-600'}`}>{groupMessageStatus[g.id || g._id]}</p>
                             )}
                           </div>
                         </td>

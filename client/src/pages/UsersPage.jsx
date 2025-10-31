@@ -166,7 +166,7 @@ const UsersPage = () => {
       setIsCreateOpen(false);
       fetchUsers();
     } catch (err) {
-      setCreateStatus(`Hata: ${err?.response?.data?.message || err.message}`);
+      setCreateStatus(`Xəta: ${err?.response?.data?.message || err.message}`);
     }
   };
 
@@ -214,7 +214,7 @@ const UsersPage = () => {
       setEditUser(null);
       fetchUsers();
     } catch (err) {
-      setEditStatus(`Hata: ${err?.response?.data?.message || err.message}`);
+      setEditStatus(`Xəta: ${err?.response?.data?.message || err.message}`);
     }
   };
 
@@ -343,7 +343,7 @@ const UsersPage = () => {
                 <Button type="submit">Yarat</Button>
               </div>
               {createStatus && (
-                <p className={`text-sm ${createStatus.startsWith('Hata') ? 'text-red-600' : createStatus === 'loading' ? 'text-gray-500' : 'text-green-600'}`}>{createStatus}</p>
+                <p className={`text-sm ${createStatus.startsWith('Xəta') ? 'text-red-600' : createStatus === 'loading' ? 'text-gray-500' : 'text-green-600'}`}>{createStatus}</p>
               )}
             </form>
           </div>
@@ -411,7 +411,7 @@ const UsersPage = () => {
                 <Button type="submit">Yadda saxla</Button>
               </div>
               {editStatus && (
-                <p className={`text-sm ${editStatus.startsWith('Hata') ? 'text-red-600' : editStatus === 'loading' ? 'text-gray-500' : 'text-green-600'}`}>{editStatus}</p>
+                <p className={`text-sm ${editStatus.startsWith('Xəta') ? 'text-red-600' : editStatus === 'loading' ? 'text-gray-500' : 'text-green-600'}`}>{editStatus}</p>
               )}
             </form>
           </div>

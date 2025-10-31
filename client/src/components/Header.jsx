@@ -54,7 +54,7 @@ const Header = ({ onMenuToggle, showMenuButton = false }) => {
                 <Link to="/employees" className="text-sm font-medium text-gray-700 hover:text-gray-900">Əməkdaşlar</Link>
               )}
               {(user?.permissions?.isSuperAdmin === true || user?.permissions?.canAddAdmin === true) && (
-                <Link to="/groups" className="text-sm font-medium text-gray-700 hover:text-gray-900">Gruplar</Link>
+                <Link to="/groups" className="text-sm font-medium text-gray-700 hover:text-gray-900">Qruplar</Link>
               )}
             </nav>
           )}

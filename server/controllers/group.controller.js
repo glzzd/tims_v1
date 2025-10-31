@@ -432,6 +432,8 @@ const searchGroups = async (req, res) => {
 
 // Mesaj göndər
 const sendMessage = async (req, res) => {
+  
+  
     try {
   const message = await GroupService.sendMessage(
     req.params.id,
@@ -453,7 +455,6 @@ const sendMessage = async (req, res) => {
     }
   };
 
-// Kurumdaki tüm qruplara mesaj
 const sendInstitutionMessage = async (req, res) => {
   try {
     const result = await GroupService.sendInstitutionMessage(
@@ -602,6 +603,48 @@ const updateMessage = async (req, res) => {
   }
 };
 
+// Grup API anahtarını döndür (rotate)
+const rotateApiKey = async (req, res) => {
+  try {
+    const requester = req.user;
+    const isSuper = requester?.permissions?.isSuperAdmin === true;
+    const canWriteAll = requester?.permissions?.canWriteAllGroups === true;
+    const canWriteInst = requester?.permissions?.canWriteInstitutionGroups === true;
+
+    if (!isSuper && !canWriteAll && !canWriteInst) {
+      return res.status(403).json({ success: false, message: messages.UNAUTHORIZED });
+    }
+
+    if (!isSuper && !canWriteAll && canWriteInst) {
+      const current = await GroupService.getGroupById(req.params.id);
+      if (!requester.institution || String(requester.institution) !== String(current?.institution?._id || current?.institution || '')) {
+        return res.status(403).json({ success: false, message: messages.UNAUTHORIZED });
+      }
+    }
+
+    const result = await GroupService.rotateApiKey(req.params.id);
+    res.status(200).json({ success: true, message: messages.GROUP_APIKEY_ROTATED, data: result });
+  } catch (error) {
+    const statusCode = error.message === messages.GROUP_NOT_FOUND ? 404 : 400;
+    res.status(statusCode).json({ success: false, message: error.message });
+  }
+};
+
+// Internal (auth-based): Kuruma ait tüm grup API key’lerini listele
+const getInstitutionApiKeysInternal = async (req, res) => {
+  try {
+    const { institutionId } = req.params;
+    const data = await GroupService.getInstitutionApiKeysInternal(institutionId, req.user);
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    const notFound = error.message === messages.INSTITUTION_NOT_FOUND;
+    const inactive = error.message === messages.INSTITUTION_INACTIVE;
+    const unauthorized = error.message === messages.UNAUTHORIZED;
+    const statusCode = unauthorized ? 403 : notFound ? 404 : inactive ? 403 : 400;
+    res.status(statusCode).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   createGroup,
   getAllGroups,
@@ -626,5 +669,7 @@ module.exports = {
   sendDirectMessage,
   getDirectMessages,
   updateMessage,
-  getMessageLogs
+  getMessageLogs,
+  rotateApiKey,
+  getInstitutionApiKeysInternal
 };
