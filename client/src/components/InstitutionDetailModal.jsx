@@ -217,14 +217,14 @@ const InstitutionDetailModal = ({ institution, onClose, onUpdated }) => {
       return;
     }
     try {
-      setRotateStatus('Yenileniyor...');
+      setRotateStatus('Yenilənir...');
       setApiKeyResult(null);
       const res = await postRequests.rotateGroupApiKey(selectedGroupId);
       const newKey = res?.data?.data?.apiKey || '';
       setApiKeyResult({ groupId: selectedGroupId, apiKey: newKey });
       setListingApiKey(newKey);
       setShowNewApiKey(false);
-      setRotateStatus('Başarıyla yenilendi');
+      setRotateStatus('Uğurla yeniləndi');
       try { window.__showToast && window.__showToast({ type: 'success', title: 'Başarılı', message: 'API açarı yenilendi' }); } catch (_) {}
     } catch (err) {
       setRotateStatus(`Hata: ${err?.response?.data?.message || err.message}`);
@@ -233,10 +233,10 @@ const InstitutionDetailModal = ({ institution, onClose, onUpdated }) => {
 
   const handleBulkRotateApiKeys = async () => {
     if (!groups || groups.length === 0) {
-      setBulkRotateStatus('Qrup bulunamadı');
+      setBulkRotateStatus('Qrup tapılmadı');
       return;
     }
-    setBulkRotateStatus('Toplu yenileme başlıyor...');
+    setBulkRotateStatus('Toplu yenilemə başlayır...');
     setBulkRotateResults([]);
     try {
       const results = [];
@@ -250,7 +250,7 @@ const InstitutionDetailModal = ({ institution, onClose, onUpdated }) => {
         }
       }
       setBulkRotateResults(results);
-      setBulkRotateStatus('Toplu yenileme tamamlandı');
+      setBulkRotateStatus('Toplu yenilemə tamamlandı');
       try { window.__showToast && window.__showToast({ type: 'success', title: 'Başarılı', message: 'Tüm gruplarda API açarı yenilendi' }); } catch (_) {}
     } catch (err) {
       setBulkRotateStatus(`Hata: ${err?.response?.data?.message || err.message}`);
@@ -270,7 +270,7 @@ const InstitutionDetailModal = ({ institution, onClose, onUpdated }) => {
       const arr = Array.isArray(res?.data?.data) ? res.data.data : [];
       setApiKeysList(arr);
       if (arr.length === 0) {
-        setApiKeysError('Bu kurum için qrup/API açarı bulunamadı');
+        setApiKeysError('Bu kurum için qrup/API açarı tapılmadı');
       }
     } catch (err) {
       setApiKeysError(err?.response?.data?.message || err.message);
@@ -288,7 +288,7 @@ const InstitutionDetailModal = ({ institution, onClose, onUpdated }) => {
       const arr = Array.isArray(res?.data?.data) ? res.data.data : [];
       setApiKeysList(arr);
       if (arr.length === 0) {
-        setApiKeysError('Bu kurum için qrup/API açarı bulunamadı');
+        setApiKeysError('Bu kurum için qrup/API açarı tapılmadı');
       }
     } catch (err) {
       setApiKeysError(err?.response?.data?.message || err.message);
@@ -503,30 +503,9 @@ const InstitutionDetailModal = ({ institution, onClose, onUpdated }) => {
                 <Button type="button" onClick={handleRotateGroupApiKey}>Seçilən qrup üçün API açarı yarat/yenilə</Button>
                 <Button type="button" variant="outline" onClick={handleBulkRotateApiKeys}>Bütün aktiv qruplar üçün yarat/yenilə</Button>
               </div>
-              <div>
-                {rotateStatus && (
-                  <p className={`text-xs ${rotateStatus.startsWith('Hata') ? 'text-red-600' : rotateStatus === 'Yenilənir...' ? 'text-gray-600' : 'text-green-600'}`}>{rotateStatus}</p>
-                )}
-                {apiKeyResult?.apiKey && (
-                  <div className="mt-2 rounded-md border bg-gray-50 p-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-medium text-gray-700">Yeni API açarı</p>
-                      <div className="flex items-center gap-2">
-                        <Button size="sm" variant="outline" onClick={() => setShowNewApiKey((v) => !v)}>
-                          {showNewApiKey ? 'Gizle' : 'Göster'}
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => copyText(apiKeyResult.apiKey)}>Kopyala</Button>
-                      </div>
-                    </div>
-                    <p className="mt-1 text-xs text-gray-900 break-all font-mono">
-                      {showNewApiKey ? apiKeyResult.apiKey : maskKey(apiKeyResult.apiKey)}
-                    </p>
-                    <p className="mt-1 text-[10px] text-gray-500">Not: Rotasyon sonrası header alanı otomatik güncellenir. Anahtarı güvenli saklayınız.</p>
-                  </div>
-                )}
-              </div>
+             
             </div>
-            {bulkRotateStatus && <p className={`mt-2 text-xs ${bulkRotateStatus.startsWith('Hata') ? 'text-red-600' : bulkRotateStatus.includes('başlıyor') ? 'text-gray-600' : 'text-green-600'}`}>{bulkRotateStatus}</p>}
+            {bulkRotateStatus && <p className={`mt-2 text-xs ${bulkRotateStatus.startsWith('Hata') ? 'text-red-600' : bulkRotateStatus.includes('başlayır') ? 'text-gray-600' : 'text-green-600'}`}>{bulkRotateStatus}</p>}
             {bulkRotateResults.length > 0 && (
               <div className="mt-2 border rounded-md p-3">
                 <p className="text-xs text-gray-600 mb-1">Toplu sonuçlar:</p>
@@ -554,7 +533,7 @@ const InstitutionDetailModal = ({ institution, onClose, onUpdated }) => {
                 </table>
               </div>
             )}
-            {/* Kurum API açarı siyahısı (external, header x-api-key) */}
+            {/* Kurum API açarı siyahısı */}
             <div className="mt-6 border rounded-md p-4 bg-white">
               <div className='flex items-center justify-between'>
 
@@ -568,6 +547,23 @@ const InstitutionDetailModal = ({ institution, onClose, onUpdated }) => {
                 
                 
               </div>
+              {apiKeyResult?.apiKey && (
+                <div className="mt-3 w-full rounded-md border bg-gray-50 p-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-gray-700">Yeni API açarı</p>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setShowNewApiKey((v) => !v)}>
+                        {showNewApiKey ? 'Gizlət' : 'Göstər'}
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => copyText(apiKeyResult.apiKey)}>Kopyala</Button>
+                    </div>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-900 break-all font-mono">
+                    {showNewApiKey ? apiKeyResult.apiKey : maskKey(apiKeyResult.apiKey)}
+                  </p>
+                 
+                </div>
+              )}
               {apiKeysError && <p className="mt-2 text-xs text-red-600">{apiKeysError}</p>}
               {apiKeysLoading && <p className="mt-2 text-xs text-gray-600">Yükleniyor...</p>}
               {apiKeysList.length > 0 && (
