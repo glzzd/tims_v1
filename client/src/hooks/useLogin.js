@@ -31,7 +31,7 @@ export const useLogin = () => {
       
       if (result.success) {
         console.log("Login successful:", result.message);
-        // AuthContext login fonksiyonu başarılı olursa otomatik yönlendirme
+        // AuthContext login fonksiyonu Uğurlu olursa otomatik yönlendirme
         navigate('/home', { replace: true });
       } else {
         setError(result.error || "Login failed");

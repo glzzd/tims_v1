@@ -161,7 +161,7 @@ const UsersPage = () => {
         payload.institutionId = createForm.institutionId;
       }
       await postRequests.createUser(payload);
-      setCreateStatus('Başarılı');
+      setCreateStatus('Uğurlu');
       setCreateForm({ name: '', email: '', password: '', institutionId: '', permissions: defaultPermissions });
       setIsCreateOpen(false);
       fetchUsers();

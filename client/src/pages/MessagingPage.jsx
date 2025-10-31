@@ -172,7 +172,7 @@ const MessagingPage = () => {
         if (!selectedGroupId) throw new Error('Qrup seçin');
         res = await postRequests.sendGroupMessage(selectedGroupId, { content });
       }
-      setStatusMsg(`Başarılı: ${res?.data?.message || 'Mesaj gönderildi'}`);
+      setStatusMsg(`Uğurlu: ${res?.data?.message || 'Mesaj gönderildi'}`);
       setContent('');
       await fetchLogs(1);
     } catch (err) {

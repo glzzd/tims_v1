@@ -225,7 +225,9 @@ const InstitutionDetailModal = ({ institution, onClose, onUpdated }) => {
       setListingApiKey(newKey);
       setShowNewApiKey(false);
       setRotateStatus('Uğurla yeniləndi');
-      try { window.__showToast && window.__showToast({ type: 'success', title: 'Başarılı', message: 'API açarı yenilendi' }); } catch (_) {}
+      try { window.__showToast && window.__showToast({ type: 'success', title: 'Uğurlu', message: 'API açarı yeniləndi' }); } catch (_) {}
+      // Rotasyondan sonra kurum API anahtarı listesi otomatik güncellensin
+      try { await fetchInstitutionApiKeysInternal(); } catch (_) {}
     } catch (err) {
       setRotateStatus(`Hata: ${err?.response?.data?.message || err.message}`);
     }
@@ -251,7 +253,9 @@ const InstitutionDetailModal = ({ institution, onClose, onUpdated }) => {
       }
       setBulkRotateResults(results);
       setBulkRotateStatus('Toplu yenilemə tamamlandı');
-      try { window.__showToast && window.__showToast({ type: 'success', title: 'Başarılı', message: 'Tüm gruplarda API açarı yenilendi' }); } catch (_) {}
+      try { window.__showToast && window.__showToast({ type: 'success', title: 'Uğurlu', message: 'Tüm gruplarda API açarı yeniləndi' }); } catch (_) {}
+      // Toplu rotasyondan sonra kurum API anahtarı listesi otomatik güncellensin
+      try { await fetchInstitutionApiKeysInternal(); } catch (_) {}
     } catch (err) {
       setBulkRotateStatus(`Hata: ${err?.response?.data?.message || err.message}`);
     }

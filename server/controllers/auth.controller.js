@@ -39,7 +39,7 @@ const profile = async (req, res) => {
 const logout = async (req, res) => {
   try {
     // If using refresh tokens or server-side sessions, revoke here.
-    res.status(200).json({ success: true, message: 'Çıkış başarılı' });
+    res.status(200).json({ success: true, message: 'Çıkış Uğurlu' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Çıkış başarısız' });
   }
