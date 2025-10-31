@@ -85,7 +85,7 @@ const InstitutionsPage = () => {
         }
         return g;
       }));
-      setRowActionStatus('Katılımcı eklendi');
+      setRowActionStatus('Üzv eklendi');
     } catch (err) {
       setRowActionStatus(`Xəta: ${err?.response?.data?.message || err.message}`);
     }
@@ -100,7 +100,7 @@ const InstitutionsPage = () => {
         }
         return g;
       }));
-      setRowActionStatus('Katılımcı çıkarıldı');
+      setRowActionStatus('Üzv çıkarıldı');
     } catch (err) {
       setRowActionStatus(`Xəta: ${err?.response?.data?.message || err.message}`);
     }
@@ -335,7 +335,7 @@ const InstitutionsPage = () => {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Ad</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Katılımcılar</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Üzvlar</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -346,7 +346,7 @@ const InstitutionsPage = () => {
                           <div className="flex items-center justify-between mb-2">
                             <div className="text-xs text-gray-500">Ümumi: {Array.isArray(g.members) ? g.members.length : 0}</div>
                             <Button size="sm" variant="outline" onClick={(e) => toggleEditGroup(e, g.id || g._id)}>
-                              {editingGroupId === (g.id || g._id) ? 'Düzenlemeyi kapat' : 'Katılımcıları düzenle'}
+                              {editingGroupId === (g.id || g._id) ? 'Düzenlemeyi kapat' : 'Üzvləri redaktə et'}
                             </Button>
                           </div>
                           {Array.isArray(g.members) && g.members.length > 0 ? (
@@ -403,7 +403,7 @@ const InstitutionsPage = () => {
                                 onChange={(e) => setGroupMessageInputs(prev => ({ ...prev, [g.id || g._id]: e.target.value }))}
                                 placeholder="Mesaj məzmunu"
                               />
-                              <Button size="sm" onClick={() => handleSendGroupMessage(g.id || g._id)}>Gönder</Button>
+                              <Button size="sm" onClick={() => handleSendGroupMessage(g.id || g._id)}>Göndər</Button>
                             </div>
                             {groupMessageStatus[g.id || g._id] && (
                               <p className={`text-xs ${String(groupMessageStatus[g.id || g._id]).startsWith('Xəta') ? 'text-red-600' : groupMessageStatus[g.id || g._id] === 'gönderiliyor' ? 'text-gray-500' : 'text-green-600'}`}>{groupMessageStatus[g.id || g._id]}</p>

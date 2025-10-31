@@ -1,7 +1,8 @@
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
 import { Home, Users, MessageSquare, Building2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { getRequests } from '@/apiRequests/getRequests';
 import { Link } from 'react-router-dom';
 
@@ -13,34 +14,78 @@ const HomePage = () => {
     employeesInMyInstitution: 0
   });
   const [recentLogs, setRecentLogs] = useState([]);
+  const [myGroups, setMyGroups] = useState([]);
+  const [myInstitutions, setMyInstitutions] = useState([]);
+  const [trendData, setTrendData] = useState([]); // [{ day: '2025-10-01', count: 3 }, ...]
+  const [loadingDashboard, setLoadingDashboard] = useState(false);
+  const [dashboardError, setDashboardError] = useState(null);
+
+  const daysWindow = 14;
+
+  const formatDay = (date) => {
+    const d = new Date(date);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const aggregateDailyCounts = (logs, days = daysWindow) => {
+    const today = new Date();
+    const series = [];
+    const counts = {};
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const key = formatDay(d);
+      series.push(key);
+      counts[key] = 0;
+    }
+    (logs || []).forEach((log) => {
+      const key = formatDay(log.createdAt || log.updatedAt || Date.now());
+      if (key in counts) counts[key] += 1;
+    });
+    return series.map((day) => ({ day, count: counts[day] || 0 }));
+  };
 
   useEffect(() => {
     let mounted = true;
     const load = async () => {
+      setLoadingDashboard(true);
+      setDashboardError(null);
       try {
-        const [groupsRes, instRes] = await Promise.all([
+        const [groupsRes, instRes, logsRes] = await Promise.all([
           getRequests.getMyGroups(),
-          getRequests.getMyInstitutions()
+          getRequests.getMyInstitutions(),
+          getRequests.getMessageLogs({ page: 1, limit: 200, action: 'send' })
         ]);
-        const myGroups = Array.isArray(groupsRes?.data?.data) ? groupsRes.data.data : [];
-        const myInsts = Array.isArray(instRes?.data?.data) ? instRes.data.data : [];
+        const groups = Array.isArray(groupsRes?.data?.data) ? groupsRes.data.data : [];
+        const insts = Array.isArray(instRes?.data?.data) ? instRes.data.data : [];
+        const logs = Array.isArray(logsRes?.data?.data) ? logsRes.data.data : [];
+
         let empCount = 0;
-        if (myInsts[0]?.id || myInsts[0]?._id) {
-          const instId = String(myInsts[0].id || myInsts[0]._id);
+        if (insts[0]?.id || insts[0]?._id) {
+          const instId = String(insts[0].id || insts[0]._id);
           try {
             const empRes = await getRequests.getEmployees({ institution: instId, limit: 1 });
             empCount = empRes?.data?.pagination?.total || empRes?.data?.pagination?.totalItems || 0;
           } catch (_) {}
         }
+
+        const trend = aggregateDailyCounts(logs, daysWindow);
+
         if (mounted) {
-          setStats({ myGroups: myGroups.length, myInstitutions: myInsts.length, employeesInMyInstitution: empCount });
+          setMyGroups(groups);
+          setMyInstitutions(insts);
+          setStats({ myGroups: groups.length, myInstitutions: insts.length, employeesInMyInstitution: empCount });
+          setRecentLogs(logs.slice(0, 5));
+          setTrendData(trend);
         }
-      } catch (_) {}
-      try {
-        const logsRes = await getRequests.getMessageLogs({ page: 1, limit: 5, action: 'send' });
-        const items = Array.isArray(logsRes?.data?.data) ? logsRes.data.data : [];
-        if (mounted) setRecentLogs(items);
-      } catch (_) {}
+      } catch (err) {
+        if (mounted) setDashboardError(err?.response?.data?.message || err.message || 'Panel yüklənmə xətası');
+      } finally {
+        if (mounted) setLoadingDashboard(false);
+      }
     };
     load();
     return () => { mounted = false; };
@@ -103,51 +148,65 @@ const HomePage = () => {
         </div>
       </div>
 
-      {/* Tez hərəkətlər */}
+      {/* Mesaj trendi (Son 14 gün) */}
       <div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Tez hərəkətlər</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white rounded-lg shadow">
-            <div className="p-6">
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="p-3 rounded-full bg-blue-50 text-blue-600">
-                  <MessageSquare className="h-6 w-6" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">Mesajlaşma</h3>
-                  <p className="text-sm text-gray-600 mb-3">Qruplara və işçilərə mesaj göndər</p>
-                  <Link to="/messaging"><Button variant="outline" size="sm" className="w-full">Aç</Button></Link>
-                </div>
-              </div>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Son 14 gün mesaj trendi</h2>
+        <div className="bg-white rounded-lg shadow p-4">
+          {loadingDashboard ? (
+            <p className="text-sm text-gray-600">Yüklənir...</p>
+          ) : dashboardError ? (
+            <p className="text-sm text-red-600">{dashboardError}</p>
+          ) : trendData.length === 0 ? (
+            <p className="text-sm text-gray-600">Məlumat tapılmadı.</p>
+          ) : (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={trendData.map((d) => ({ name: new Date(d.day).toLocaleDateString(), count: d.count }))}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-15} height={40} />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip formatter={(value) => [`${value}`, 'Mesaj sayısı']} />
+                  <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-          </div>
-          <div className="bg-white rounded-lg shadow">
-            <div className="p-6">
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="p-3 rounded-full bg-green-50 text-green-600">
-                  <Users className="h-6 w-6" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">İşçilər</h3>
-                  <p className="text-sm text-gray-600 mb-3">Qurum üzrə işçi siyahısı</p>
-                  <Link to="/employees"><Button variant="outline" size="sm" className="w-full">Aç</Button></Link>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-lg shadow">
-            <div className="p-6">
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="p-3 rounded-full bg-purple-50 text-purple-600">
-                  <MessageSquare className="h-6 w-6" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">Qruplar</h3>
-                  <p className="text-sm text-gray-600 mb-3">Mesaj qruplarını idarə et</p>
-                  <Link to="/messaging"><Button variant="outline" size="sm" className="w-full">Aç</Button></Link>
-                </div>
-              </div>
-            </div>
+          )}
+        </div>
+      </div>
+
+     
+
+      {/* Mənim qruplarım */}
+      <div>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Mənim qruplarım</h2>
+        <div className="bg-white rounded-lg shadow">
+          <div className="p-6">
+            {loadingDashboard ? (
+              <p className="text-sm text-gray-600">Yüklənir...</p>
+            ) : myGroups.length === 0 ? (
+              <p className="text-sm text-gray-600">Qrup tapılmadı.</p>
+            ) : (
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Ad</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Qurum</th>
+                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Əməliyyat</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {myGroups.map((g) => (
+                    <tr key={g._id || g.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-2 text-sm text-gray-900">{g.name || '—'}</td>
+                      <td className="px-4 py-2 text-sm text-gray-900">{(g.institution && (g.institution.name || g.institution.shortName)) || '—'}</td>
+                      <td className="px-4 py-2 text-right">
+                        <Link to="/messaging"><Button size="sm" variant="outline">Mesajlaşma</Button></Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       </div>
