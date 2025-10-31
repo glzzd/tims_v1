@@ -329,7 +329,7 @@ const removeAdmin = async (req, res) => {
     }
   };
 
-// İşçinin qruplarını getir
+// İşçinin qruplarını gətir
 const getEmployeeGroups = async (req, res) => {
     try {
       const groups = await GroupService.getEmployeeGroups(req.params.employeeId);
