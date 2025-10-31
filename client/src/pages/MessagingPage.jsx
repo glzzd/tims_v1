@@ -288,7 +288,7 @@ const MessagingPage = () => {
                   <div>
                     <p className="text-sm font-medium text-gray-900">{actionLabel(log.action)}</p>
                     <p className="text-xs text-gray-600">
-                      {new Date(log.createdAt).toLocaleString()} • Aktor: {actorLabel(log)}
+                      {new Date(log.createdAt).toLocaleString()} 
                     </p>
                   </div>
                   <span className={`text-xs px-2 py-1 rounded bg-blue-100 text-blue-700`}>{actionLabel(log.action)}</span>
